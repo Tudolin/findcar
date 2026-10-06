@@ -1,0 +1,67 @@
+name: Deploy
+
+# Runs ON the homelab via a self-hosted runner (nothing inbound is opened; the runner
+# polls GitHub). Same model as findhome. Setup:
+#   1. Settings → Actions → Runners → New self-hosted runner (on the Debian host)
+#   2. Label it `carwatch-server`; run as a service: sudo ./svc.sh install && sudo ./svc.sh start
+#   3. The runner user must be in the `docker` group.
+#   4. Put compose.yaml + .env in the Dockge stack dir (default /opt/stacks/carwatch) or set
+#      the repository variable CARWATCH_DIR.
+# Keep the repository PRIVATE: a self-hosted runner executes repository code on your host.
+
+on:
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Image tag (latest, sha-xxxxxxx, 1.2.0)"
+        required: false
+        default: latest
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, carwatch-server]
+    timeout-minutes: 15
+    # A failed Release published nothing; don't redeploy the previous image.
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    permissions:
+      contents: read
+      packages: read
+    env:
+      DIR: ${{ vars.CARWATCH_DIR || '/opt/stacks/carwatch' }}
+      TAG: ${{ inputs.tag || 'latest' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sync compose file into the Dockge stack (keeps your .env)
+        run: |
+          mkdir -p "$DIR"
+          test -f "$DIR/.env" || { echo "::error::$DIR/.env não existe — copie .env.example e preencha"; exit 1; }
+          cp docker-compose.yml "$DIR/compose.yaml"
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+      - name: Pull and restart
+        working-directory: ${{ env.DIR }}
+        run: |
+          export TAG
+          docker compose pull app migrate
+          docker compose up -d --no-build --remove-orphans
+      - name: Wait for healthy
+        working-directory: ${{ env.DIR }}
+        run: |
+          for i in $(seq 1 30); do
+            status=$(docker inspect -f '{{.State.Health.Status}}' carwatch-app 2>/dev/null || echo starting)
+            [ "$status" = healthy ] && { echo "carwatch healthy"; exit 0; }
+            sleep 5
+          done
+          docker compose logs --tail=200 app migrate
+          exit 1
+      - name: Prune old images
+        if: success()
+        run: docker image prune -f --filter "label=org.opencontainers.image.source=https://github.com/Tudolin/findcar"

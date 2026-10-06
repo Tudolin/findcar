@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_call:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: carwatch
+          POSTGRES_PASSWORD: carwatch
+          POSTGRES_DB: carwatch
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U carwatch" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://carwatch:carwatch@localhost:5432/carwatch
+      DATA_DIR: /tmp/carwatch
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e ".[dev]"
+      - name: Lint (ruff)
+        run: ruff check .
+      - name: Tests (pytest, SQLite + fixtures; no live sites)
+        run: pytest
+      - name: Migrations apply on Postgres 16 and match the models
+        run: |
+          alembic upgrade head
+          alembic check
+          python -m app.seed

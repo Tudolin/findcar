@@ -28,6 +28,14 @@ class Settings(BaseSettings):
         "(KHTML, like Gecko) Chrome/128.0 Safari/537.36"
     )
 
+    # Headless Chromium (OLX always; Webmotors when plain HTTP is turned away)
+    browser_enabled: bool = True
+    browser_proxy: str = ""  # e.g. http://user:pass@host:port — normally empty
+    browser_executable: str = ""  # override Playwright's bundled Chromium
+    # Cloudflare sometimes challenges a single request. Retry it ONCE after a long pause;
+    # a second block stops the run (no challenge solving, ever).
+    browser_block_retry_delay: float = 60.0
+
     # FIPE (free public API, optional free token raises the daily quota)
     fipe_base_url: str = "https://fipe.parallelum.com.br/api/v2"
     fipe_token: str = ""

@@ -5,8 +5,14 @@
 <div class="page-head">
   <div><h1>Veículos</h1><p>Anúncios deduplicados entre fontes, ordenados pelo critério escolhido</p></div>
 </div>
-<form class="card card-pad" id="filters" hx-get="/vehicles" hx-target="#results" hx-push-url="true"
+<form class="card card-pad" id="filters" x-data="{ open: window.innerWidth > 900 }" hx-get="/vehicles" hx-target="#results" hx-push-url="true"
       hx-trigger="change, input changed delay:350ms from:input[type=search], submit" hx-indicator="#results">
+  <button type="button" class="btn mobile-only" style="width:100%" @click="open = !open" :aria-expanded="open">
+    {{ icon("sliders") }} <span x-text="open ? 'Ocultar filtros' : 'Filtros e ordenação'"></span>
+    {% set active = [f.q, f.model, f.max_price, f.min_year, f.max_km, f.source, f.automatic, f.stage]|select|list|length %}
+    {% if active %}<span class="badge accent">{{ active }}</span>{% endif %}
+  </button>
+  <div x-show="open" x-collapse.duration.200ms :class="open && window.innerWidth <= 900 && 'mt'">
   <div class="filters">
     <label class="field">Buscar<input type="search" name="q" value="{{ f.q }}" placeholder="versão, cidade, notas…"></label>
     <label class="field">Modelo<select name="model"><option value="">Todos</option>{% for m in models %}<option {{ 'selected' if f.model == m }}>{{ m }}</option>{% endfor %}</select></label>
@@ -26,7 +32,8 @@
     </div>
     <label class="check small"><input type="checkbox" name="automatic" value="true" {{ 'checked' if f.automatic }}> Só automático</label>
     <label class="field" style="flex-direction:row;align-items:center;gap:8px">Etapa
-      <select name="stage" style="width:auto;height:32px"><option value="">Todas (exceto descartados)</option>{% for s in STAGES %}<option value="{{ s.value }}" {{ 'selected' if f.stage == s.value }}>{{ STAGE_LABELS[s] }}</option>{% endfor %}</select></label>
+      <select name="stage" style="width:auto"><option value="">Todas (exceto descartados)</option>{% for s in STAGES %}<option value="{{ s.value }}" {{ 'selected' if f.stage == s.value }}>{{ STAGE_LABELS[s] }}</option>{% endfor %}</select></label>
+  </div>
   </div>
 </form>
 <div id="results" class="mt">{% include "partials/vehicle_grid.html" %}</div>

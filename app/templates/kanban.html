@@ -4,7 +4,7 @@
 {% block head %}<script src="/static/vendor/sortable.min.js" defer></script>{% endblock %}
 {% block content %}
 <div class="page-head">
-  <div><h1>Decisão</h1><p>Arraste os cards entre as etapas. “Novo” mostra só ativos com score ≥ 50 ou favoritos.</p></div>
+  <div><h1>Decisão</h1><p><span class="desktop-only">Arraste os cards entre as etapas.</span><span class="mobile-only">Deslize entre as colunas; segure um card para arrastá-lo.</span> “Novo” mostra só ativos com score ≥ 50 ou favoritos.</p></div>
 </div>
 <div class="board">
   {% for stage, items in cols.items() %}
@@ -38,6 +38,8 @@ window.addEventListener("load", () => {
   document.querySelectorAll(".col-list").forEach((el) => {
     new Sortable(el, {
       group: "kanban", animation: 150, ghostClass: "sortable-ghost",
+      delay: 220, delayOnTouchOnly: true, touchStartThreshold: 6,
+      scroll: true, scrollSensitivity: 80, bubbleScroll: true,
       onAdd: async (evt) => {
         const id = evt.item.dataset.id, stage = evt.to.dataset.stage;
         const body = new URLSearchParams({ stage });

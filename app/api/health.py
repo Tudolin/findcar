@@ -1,5 +1,7 @@
+from pathlib import Path
+
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy import text
 from sqlmodel import Session, select
 
@@ -43,3 +45,23 @@ def health_page(request: Request, session: Session = Depends(get_session)):
         "next_runs": scheduler.next_runs(),
         "telegram": telegram.configured(),
     })
+
+
+# -- PWA (served from the root so the service worker controls every page) ------------
+_STATIC = Path(__file__).resolve().parent.parent / "static"
+
+
+@router.get("/manifest.webmanifest", include_in_schema=False)
+def manifest():
+    return FileResponse(_STATIC / "manifest.webmanifest", media_type="application/manifest+json")
+
+
+@router.get("/sw.js", include_in_schema=False)
+def service_worker():
+    return FileResponse(_STATIC / "sw.js", media_type="text/javascript",
+                        headers={"Cache-Control": "no-cache", "Service-Worker-Allowed": "/"})
+
+
+@router.get("/offline", include_in_schema=False)
+def offline(request: Request):
+    return templates.TemplateResponse(request, "offline.html", {})

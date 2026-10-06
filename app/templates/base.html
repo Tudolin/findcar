@@ -2,16 +2,26 @@
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f5f6f8" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0c1018" media="(prefers-color-scheme: dark)">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="carwatch">
+  <meta name="format-detection" content="telephone=no">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
   <title>{% block title %}carwatch{% endblock %} · carwatch</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%234f46e5'/><path d='M7 20h18M6 20v-4l2-5h16l2 5v4' stroke='white' stroke-width='2.2' fill='none' stroke-linejoin='round'/></svg>">
+  <link rel="icon" type="image/png" href="/static/icons/icon-192.png">
   <link rel="stylesheet" href="/static/css/app.css">
   <script src="/static/js/app.js"></script>
   <script src="/static/vendor/htmx.min.js" defer></script>
+  <script src="/static/vendor/alpine-collapse.min.js" defer></script>
   <script src="/static/vendor/alpine.min.js" defer></script>
   {% block head %}{% endblock %}
 </head>
-<body hx-boost="false" x-data>
+<body hx-boost="false" x-data="{ more: false }" @keydown.escape="more = false">
 <div class="shell">
   <aside class="sidebar">
     <a href="/" class="brand"><span class="brand-mark">{{ icon("car") }}</span><span>carwatch</span></a>
@@ -34,6 +44,24 @@
   </main>
 </div>
 
+{# ---- mobile: bottom tab bar + "Mais" sheet ---- #}
+<nav class="tabbar" aria-label="Navegação">
+  {% for key, href, ic, label in [("dashboard","/","grid","Início"),("vehicles","/vehicles","car","Veículos"),("kanban","/kanban","kanban","Decisão"),("compare","/compare","scale","Comparar")] %}
+  <a href="{{ href }}" class="{{ 'active' if nav == key }}" {% if key == 'compare' %}:href="$store.cmp.url()"{% endif %}>
+    <span class="ic">{{ icon(ic) }}{% if key == 'compare' %}<b class="pill" x-show="$store.cmp.ids.length" x-text="$store.cmp.ids.length" x-cloak></b>{% endif %}</span>{{ label }}</a>
+  {% endfor %}
+  <button type="button" :class="(more || {{ 'true' if nav in ('searches','health','settings') else 'false' }}) && 'active'" @click="more = !more" aria-haspopup="dialog" :aria-expanded="more">
+    <span class="ic"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></span>Mais</button>
+</nav>
+<div class="sheet-backdrop" x-show="more" x-transition.opacity x-cloak @click="more = false"></div>
+<div class="sheet" x-show="more" x-transition:enter-start="sheet-off" x-transition:leave-end="sheet-off" x-cloak role="dialog" aria-label="Mais opções">
+  <div class="sheet-grip"></div>
+  <a href="/searches" class="{{ 'active' if nav == 'searches' }}">{{ icon("search") }} Buscas salvas</a>
+  <a href="/health" class="{{ 'active' if nav == 'health' }}">{{ icon("pulse") }} Saúde das fontes</a>
+  <a href="/settings" class="{{ 'active' if nav == 'settings' }}">{{ icon("sliders") }} Configurações</a>
+  <button type="button" onclick="cwCycleTheme()">{{ icon("theme") }} Tema: <span x-data="{ t: cwThemeName() }" @cw-theme.window="t = $event.detail" x-text="({ auto: 'automático', light: 'claro', dark: 'escuro' })[t]"></span></button>
+</div>
+
 <div class="tray" x-show="$store.cmp.ids.length && !location.pathname.startsWith('/compare')" x-cloak x-transition>
   <span class="small"><b x-text="$store.cmp.ids.length"></b>/6 para comparar</span>
   <button class="btn ghost sm" @click="$store.cmp.clear()">Limpar</button>
@@ -45,5 +73,10 @@
   </template>
 </div>
 {% block scripts %}{% endblock %}
+<script>
+  if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) {
+    navigator.serviceWorker.register("/sw.js").catch(() => {});
+  }
+</script>
 </body>
 </html>

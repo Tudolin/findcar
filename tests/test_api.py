@@ -102,3 +102,15 @@ def test_settings_forms(client, data):
     assert client.post("/settings/schedule", data={"times": "07:05, 18:30"}).status_code == 200
     assert client.post("/settings/alerts", data={"min_score": "60"}).status_code == 200
     assert client.post("/sources/olx/toggle").status_code == 200
+
+
+def test_pwa_assets(client):
+    m = client.get("/manifest.webmanifest")
+    assert m.status_code == 200 and m.json()["display"] == "standalone"
+    sw = client.get("/sw.js")
+    assert sw.status_code == 200 and sw.headers["service-worker-allowed"] == "/"
+    assert client.get("/offline").status_code == 200
+    for icon in m.json()["icons"]:
+        assert client.get(icon["src"]).status_code == 200
+    page = client.get("/")
+    assert 'viewport-fit=cover' in page.text and 'rel="manifest"' in page.text and 'class="tabbar"' in page.text

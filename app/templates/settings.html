@@ -4,7 +4,7 @@
 {% block content %}
 <div class="page-head"><div><h1>Configurações</h1><p>Score, alertas, agenda, fontes e normalização</p></div></div>
 
-<div class="row wrap" style="margin-bottom:16px;gap:6px">
+<div class="row" style="margin-bottom:16px;gap:6px;overflow-x:auto;padding-bottom:4px;flex-wrap:nowrap">
   {% for a, l in [("score","Score"),("flags","Red flags"),("alertas","Alertas"),("agenda","Agenda"),("fontes","Fontes"),("consumo","Consumo"),("aliases","Aliases")] %}
   <a class="btn sm" href="#{{ a }}">{{ l }}</a>{% endfor %}
 </div>
@@ -38,7 +38,7 @@
     {% endfor %}
     </tbody>
   </table></div>
-  <form method="post" action="/settings/flags" class="card-pad row wrap" style="border-top:1px solid var(--border);align-items:end">
+  <form method="post" action="/settings/flags" class="card-pad row wrap inline-form" style="border-top:1px solid var(--border);align-items:end">
     <label class="field grow">Rótulo<input name="label" required placeholder="Ex.: Teto solar com infiltração"></label>
     <label class="field grow">Regex<input name="pattern" required class="mono" placeholder="infiltra"></label>
     <label class="field" style="width:110px">Penalidade<input type="number" name="penalty" value="10"></label>
@@ -89,8 +89,8 @@
   <div class="table-wrap"><table class="t compact">
     <thead><tr><th>Modelo</th><th>Cidade</th><th>Estrada</th></tr></thead>
     <tbody>
-    {% for s in specs %}<tr><td>{{ s.brand }} {{ s.model }}</td><td><input name="city_{{ s.id }}" value="{{ s.consumption_city or '' }}" style="max-width:110px"></td><td><input name="road_{{ s.id }}" value="{{ s.consumption_road or '' }}" style="max-width:110px"></td></tr>{% endfor %}
-    <tr><td class="row"><input name="new_brand" placeholder="Marca" style="max-width:120px"><input name="new_model" placeholder="Modelo" style="max-width:140px"></td><td><input name="new_city" placeholder="km/l" style="max-width:110px"></td><td><input name="new_road" placeholder="km/l" style="max-width:110px"></td></tr>
+    {% for s in specs %}<tr><td>{{ s.brand }} {{ s.model }}</td><td><input name="city_{{ s.id }}" value="{{ s.consumption_city or '' }}" style="width:96px"></td><td><input name="road_{{ s.id }}" value="{{ s.consumption_road or '' }}" style="width:96px"></td></tr>{% endfor %}
+    <tr><td><div class="row"><input name="new_brand" placeholder="Marca" style="min-width:90px"><input name="new_model" placeholder="Modelo" style="min-width:90px"></div></td><td><input name="new_city" placeholder="km/l" style="width:96px"></td><td><input name="new_road" placeholder="km/l" style="width:96px"></td></tr>
     </tbody>
   </table></div>
 </form>
@@ -103,7 +103,7 @@
     <tbody>{% for a in aliases %}<tr><td><span class="badge">{{ a.kind }}</span></td><td class="mono">{{ a.pattern }}</td><td>{{ a.canonical }}</td><td class="muted">{{ a.brand or "" }}</td>
       <td class="right"><form method="post" action="/settings/aliases/{{ a.id }}/delete"><button class="btn sm ghost icon danger">{{ icon("trash") }}</button></form></td></tr>{% endfor %}</tbody>
   </table></div></details>
-  <form method="post" action="/settings/aliases" class="card-pad row wrap" style="border-top:1px solid var(--border);align-items:end">
+  <form method="post" action="/settings/aliases" class="card-pad row wrap inline-form" style="border-top:1px solid var(--border);align-items:end">
     <label class="field" style="width:130px">Tipo<select name="kind"><option value="version">versão</option><option value="model">modelo</option><option value="brand">marca</option></select></label>
     <label class="field grow">Texto bruto<input name="pattern" required placeholder="c style"></label>
     <label class="field grow">Canônico<input name="canonical" required placeholder="comfort style"></label>

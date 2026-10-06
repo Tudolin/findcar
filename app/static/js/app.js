@@ -11,6 +11,7 @@
     else delete document.documentElement.dataset.theme;
   };
   applyTheme(store.get("cw-theme", "auto"));
+  window.cwThemeName = () => store.get("cw-theme", "auto");
   window.cwCycleTheme = () => {
     const order = ["auto", "light", "dark"];
     const next = order[(order.indexOf(store.get("cw-theme", "auto")) + 1) % 3];

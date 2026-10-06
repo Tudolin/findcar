@@ -5,10 +5,10 @@
 |---|---|---|
 | `db` | PostgreSQL 16, volume `pgdata` | interna |
 | `migrate` | one-shot `alembic upgrade head` + seed | — |
-| `web` | FastAPI + Jinja2/HTMX/Alpine/Chart.js | `${BIND_ADDRESS:-127.0.0.1}:8000` (Tailscale: usar IP tailnet) |
-| `worker` | APScheduler + adapters; **processo separado do web** | — |
+| `app` | FastAPI + Jinja2/HTMX/Alpine/Chart.js **e** APScheduler (jobs de scraping) no mesmo processo | `${BIND_ADDRESS:-127.0.0.1}:8000` (Tailscale: usar IP tailnet) |
 
-Playwright/chromium só na imagem do `worker` (imagem `worker` com target extra) para manter `web` leve.
+Decisão: manter simples — um único container de app. Playwright/chromium fica opcional (build arg), só se alguma fonte exigir.
+APIs: só gratuitas. FIPE via `https://fipe.parallelum.com.br/api/v2` (sem chave; token gratuito opcional aumenta o limite), com cache em `fipe_cache`.
 Segredos só via `.env` (`POSTGRES_PASSWORD`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `FIPE_*`).
 
 ## Estrutura
@@ -17,7 +17,7 @@ app/
   api/ (routers HTMX/JSON)   adapters/ (base.py, olx.py, webmotors.py)
   services/ (ingest, pricing, dedupe, fipe, scoring, alerts, compare)
   models/ (SQLModel)   templates/   core/ (config, logging JSON, http client c/ rate limit+cache)
-  worker.py
+  scheduler.py
 alembic/  tests/ (fixtures/olx, fixtures/webmotors)  docs/
 ```
 

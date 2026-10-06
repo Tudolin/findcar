@@ -44,3 +44,10 @@ def test_missing_data_is_ignored_not_zeroed(session):
     res = _score(session, v)
     fipe = next(b for b in res.breakdown if b["key"] == "price_fipe")
     assert fipe["points"] is None and res.score > 50
+
+
+def test_too_cheap_is_flagged(session):
+    v = Vehicle(brand="Hyundai", model="HB20", year_model=2025, km=36000, transmission="manual",
+                fipe_diff_pct=-50.6)
+    res = _score(session, v)
+    assert any("abaixo da FIPE" in f["label"] for f in res.flags)

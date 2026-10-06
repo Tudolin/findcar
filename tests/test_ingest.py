@@ -19,6 +19,9 @@ FIT = RawListing(source="webmotors", external_id="A1", url="https://wm/a1",
 class FakeAdapter(SourceAdapter):
     supports_detail = False
 
+    def close(self):
+        pass
+
     def __init__(self, name, batches):
         self.name, self.batches, self.calls = name, list(batches), 0
 
@@ -102,3 +105,19 @@ def test_price_drop_alert_logged_once(session):
         run_search_source(session, s, "webmotors", ad)
     drops = session.exec(select(AlertLog).where(AlertLog.kind == "drop")).all()
     assert len(drops) == 1 and "34.000" in drops[0].message
+
+
+def test_block_mid_run_keeps_and_processes_collected(session):
+    s = _search(session)
+
+    class HalfBlocked(FakeAdapter):
+        def search(self, filters):
+            if filters.model == "Fit":
+                return [FIT]
+            raise BlockedError("403 no segundo modelo")
+
+    run = run_search_source(session, s, "webmotors", HalfBlocked("webmotors", [[FIT]]))
+    assert run.status == "blocked" and run.n_found == 1
+    li = session.exec(select(Listing)).one()
+    v = session.get(Vehicle, li.vehicle_id)  # vehicle, FIPE and score despite the block
+    assert v is not None and v.fipe_price == 29684 and v.score is not None

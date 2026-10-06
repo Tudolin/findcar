@@ -2,13 +2,16 @@
 
 | arquivo | origem |
 |---|---|
-| `fipe/*.json` | **reais**, baixados de `fipe.parallelum.com.br/api/v2` em 2026-10-06 |
-| `webmotors/search_fit.html` | **sintético** — formato `__NEXT_DATA__` esperado; substituir por captura real |
-| `olx/*.html` | **sintético** — OLX bloqueia (Cloudflare 403); formato não verificado |
+| `fipe/*.json` | **reais**, `fipe.parallelum.com.br/api/v2` (2026-10-06) |
+| `webmotors/search_fit.html.gz` | **real**, busca Honda Fit PR ≤ R$ 50 mil, ≥ 2009 (2026-10-06), via Chromium |
+| `webmotors/detail.html.gz` | **real**, anúncio 80053571 |
+| `olx/search_fit.html.gz` | **real**, busca Honda Fit PR ≤ R$ 50 mil (2026-10-06), via Chromium |
+| `olx/detail.html.gz` | **real**, anúncio 1540279843 |
 
-Para gerar fixtures reais a partir do homelab (IP residencial):
+O HTML foi enxugado (sem `<svg>`, `<style>` e scripts que não carregam dados) e comprimido.
+Para atualizar quando um site mudar o layout:
 
 ```bash
-docker compose exec app python -m app.cli capture webmotors /data/fixtures --brand Honda --model Fit
-docker compose cp app:/data/fixtures/webmotors_search.html tests/fixtures/webmotors/search_fit.html
+docker compose exec app python -m app.cli capture olx /data/fx --brand Honda --model Fit
+docker compose cp app:/data/fx/olx_search.html - | gzip -9 > tests/fixtures/olx/search_fit.html.gz
 ```

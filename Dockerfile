@@ -13,6 +13,10 @@ LABEL org.opencontainers.image.source="https://github.com/Tudolin/findcar" \
       org.opencontainers.image.description="carwatch — monitor de carros usados" \
       org.opencontainers.image.version="${VERSION}"
 COPY --from=deps /install /usr/local
+# Headless Chromium + its system libraries (OLX only serves real browsers).
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+RUN playwright install --with-deps --only-shell chromium \
+    && rm -rf /var/lib/apt/lists/* /tmp/*
 COPY alembic.ini ./
 COPY alembic ./alembic
 COPY app ./app

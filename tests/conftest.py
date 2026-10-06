@@ -21,7 +21,26 @@ FIX = Path(__file__).parent / "fixtures"
 
 
 def fixture_text(rel: str) -> str:
-    return (FIX / rel).read_text(encoding="utf-8")
+    path = FIX / rel
+    if not path.exists() and (FIX / f"{rel}.gz").exists():
+        import gzip
+
+        return gzip.open(FIX / f"{rel}.gz", "rt", encoding="utf-8").read()
+    return path.read_text(encoding="utf-8")
+
+
+class FakeBrowser:
+    """Stands in for BrowserFetcher: serves saved HTML, records URLs."""
+
+    def __init__(self, pages):
+        self.pages, self.urls = pages, []
+
+    def get_html(self, url: str) -> str:
+        self.urls.append(url)
+        return self.pages(url) if callable(self.pages) else self.pages
+
+    def close(self):
+        pass
 
 
 @pytest.fixture(autouse=True)

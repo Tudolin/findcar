@@ -1,6 +1,6 @@
 # carwatch
 
-Monitor self-hosted de carros usados (Webmotors; OLX quando liberar). Ele guarda o histórico
+Monitor self-hosted de carros usados (OLX e Webmotors). Ele guarda o histórico
 de preços, une o mesmo carro anunciado em fontes diferentes, compara com a FIPE, dá um score
 explicado (0–100) e avisa no Telegram. Uso pessoal, um usuário, roda no homelab com Docker Compose.
 
@@ -25,13 +25,15 @@ APScheduler · Jinja2 + HTMX + Alpine.js + Chart.js (sem build step, libs servid
 
 ## Status das fontes (ver `docs/sources.md`)
 
-- **Webmotors:** funciona a partir de IP residencial (HTTP 200, dados em `__NEXT_DATA__`). De IP de
-  datacenter, o PerimeterX bloqueia. O parser localiza o array de anúncios por heurística; a
-  fixture de teste ainda é **sintética**, até ser trocada por uma captura real (veja abaixo).
-- **OLX:** o Cloudflare devolve 403 mesmo do IP residencial, inclusive no `robots.txt`. A fonte
-  vem **desativada**; o adapter existe, mas não foi validado.
-- Em bloqueio ou captcha a execução para, registra `blocked` e manda um alerta. **Não há
-  tentativa de contornar.**
+Verificado ao vivo em 2026-10-06, com fixtures de teste reais:
+
+- **OLX:** lida com **Chromium headless** (mesma lógica do findhome: cards `section.olx-adcard` e
+  JSON `#initial-data` do anúncio). Clientes HTTP comuns recebem 403 do Cloudflare.
+- **Webmotors:** HTTP primeiro (funciona de IP residencial). Se for barrado, cai para o Chromium.
+- Em bloqueio ou captcha: **uma** nova tentativa depois de ~60 s. Se repetir, a execução para,
+  registra `blocked` e manda alerta. Não há tentativa de resolver captcha.
+
+A imagem inclui o Chromium (~1,4 GB) e o app usa até ~1 GB de RAM durante as execuções.
 
 ## Setup (Debian + Dockge)
 
@@ -90,6 +92,9 @@ servidor.
 | `SCHEDULER_ENABLED` | `true` | liga o agendador interno |
 | `HTTP_MIN_DELAY` / `HTTP_MAX_DELAY` | `3` / `5` | intervalo (s) entre requisições ao mesmo host, com jitter |
 | `HTTP_CACHE_TTL` | `1800` | cache de respostas em disco (s) |
+| `BROWSER_ENABLED` | `true` | Chromium headless (necessário para a OLX) |
+| `BROWSER_BLOCK_RETRY_DELAY` | `60` | pausa (s) antes da única nova tentativa após página de bloqueio |
+| `APP_MEMORY_LIMIT` | `1G` | limite de memória do container (o Chromium usa ~350 MB) |
 | `FIPE_TOKEN` | vazio | token gratuito opcional da FIPE (aumenta a cota) |
 | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | vazio | alertas |
 | `LOG_LEVEL` | `INFO` | logs em JSON no stdout |
@@ -100,14 +105,15 @@ ficam no banco e são editados em **Configurações**.
 ### Primeira execução recomendada
 
 ```bash
-docker compose exec app python -m app.cli probe webmotors              # 1 página, não grava nada
+docker compose exec app python -m app.cli probe olx                    # 1 página + 1 detalhe, não grava
+docker compose exec app python -m app.cli probe webmotors
 docker compose exec app python -m app.cli capture webmotors /data/fx   # salva o HTML bruto
 docker compose cp app:/data/fx/webmotors_search.html ./webmotors_search.html
 ```
 
-Se o `probe` retornar anúncios, rode **Buscas → Rodar agora**. Se vier `BLOQUEADO`, a fonte
-fica registrada como bloqueada; não insista. Mande o HTML capturado para virar a fixture real
-dos testes.
+Se o `probe` retornar anúncios, rode **Buscas → Rodar agora**. Se vier `BLOQUEADO`, espere
+algumas horas (o agendador tenta de novo sozinho). O `capture` salva o HTML bruto para
+atualizar as fixtures quando um site mudar de layout.
 
 > **Sem login:** o app é de usuário único e não tem autenticação. A proteção é a rede: mantenha
 > `BIND_ADDRESS` em 127.0.0.1 ou no IP da tailnet; nunca exponha a porta na internet.

@@ -26,6 +26,8 @@ x-app: &app
     HTTP_MIN_DELAY: ${HTTP_MIN_DELAY:-3}
     HTTP_MAX_DELAY: ${HTTP_MAX_DELAY:-5}
     HTTP_CACHE_TTL: ${HTTP_CACHE_TTL:-1800}
+    BROWSER_ENABLED: ${BROWSER_ENABLED:-true}
+    BROWSER_BLOCK_RETRY_DELAY: ${BROWSER_BLOCK_RETRY_DELAY:-60}
     FIPE_TOKEN: ${FIPE_TOKEN:-}
     TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
     TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
@@ -86,7 +88,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: ${APP_MEMORY_LIMIT:-512M}
+          memory: ${APP_MEMORY_LIMIT:-1G}
 
 volumes:
   pgdata:

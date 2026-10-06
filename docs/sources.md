@@ -1,60 +1,64 @@
-# Fontes — status da investigação
+# Fontes
 
-> **Status (2026-10-06): BLOQUEADO a partir de IP de datacenter.** Investigação parada
-> conforme a regra do projeto (não burlar bloqueios). Os itens marcados como hipótese
-> ainda precisam ser confirmados a partir de um IP residencial (homelab) ou de HAR salvo.
+Status atual: **as duas fontes funcionam** (verificado ao vivo em 2026-10-06, com uma execução
+completa: 139 anúncios, 125 veículos, 98% com FIPE e 14 carros unidos entre as fontes).
 
-## Observado em 2026-10-06 (container em nuvem, IP de datacenter, httpx/curl com UA de Chrome)
-| fonte | resultado | proteção |
-|---|---|---|
-| OLX (`/autos-e-pecas/...?pe=50000&rs=32`) | **403** "Attention Required! \| Cloudflare" (até `robots.txt` deu 403) | Cloudflare WAF/Bot Management (`__cf_bm`) |
-| Webmotors (`/carros/pr-curitiba?...`) | **403** "Access to this page has been denied" com captcha | PerimeterX/HUMAN (app `PX7Vv0zOst`), via CloudFront |
-| FIPE (`fipe.parallelum.com.br/api/v2`) | **200** JSON, sem chave | — |
+## Resumo
 
-Webmotors `robots.txt`: `Disallow: /api/detail/`, `/comprar/` (com Allow por marca) e uma seção
-para bots de IA (GPTBot, ClaudeBot etc.). As páginas de busca `/carros/...` não aparecem como Disallow
-no trecho lido. O scraper do carwatch deve respeitar isso e não usar `/api/detail/`.
+| fonte | como lê | onde estão os dados | detalhe do anúncio |
+|---|---|---|---|
+| **OLX** | Chromium headless (sempre) | cards `section.olx-adcard` renderizados no HTML | `<script id="initial-data" data-json>`: descrição, cor, câmbio, combustível, `professionalAd`, fotos, `has_auction` |
+| **Webmotors** | HTTP; Chromium se for barrado | cards com link `/comprar/…/{id}` (h2 marca+modelo, h3 versão, p ano/km/cidade/preço); fallback `__NEXT_DATA__.props.pageProps.catalogProps.items` | JSON-LD `Car` (cor, câmbio, combustível, km, anos) + `Product` (preço, vendedor `AutoDealer` = loja) |
 
-Implicação: o adapter precisa rodar a partir do homelab (IP residencial), em baixo volume.
-Se o bloqueio persistir também de lá, a fonte fica desativada e marcada `blocked` em `/health`;
-não haverá tentativa de contornar o captcha nem fingerprinting.
+As fixtures em `tests/fixtures/` são páginas **reais** capturadas nessa data.
 
-## Observado do homelab (IP residencial), 2026-10-06
-| fonte | resultado |
-|---|---|
-| OLX busca | **403** (Cloudflare), sem `__NEXT_DATA__` |
-| OLX `robots.txt` | **403** |
-| Webmotors busca `/carros/pr-curitiba?...` | **200**, contém `__NEXT_DATA__` → estratégia (b) |
+## OLX
 
-Decisões:
-- **Webmotors:** o adapter lê `__NEXT_DATA__` e localiza o array de anúncios por heurística
-  (objetos com `UniqueId` + `Specification`/`Prices`). O caminho exato ainda precisa ser
-  confirmado com uma amostra real (`python -m app.cli capture webmotors ...`).
-- **OLX:** fica desativada no seed. O adapter (para `props.pageProps.ads`) existe, mas não foi
-  validado. Reativar só se o `probe` passar sem bloqueio.
+- **Por que precisa de navegador:** o Cloudflare responde 403 a clientes HTTP (`curl`, `httpx`)
+  mesmo de IP residencial; até o `robots.txt` é bloqueado. O bloqueio é pela assinatura TLS/HTTP
+  da conexão, não pelo IP. Um Chromium real recebe a página normal. É a mesma estratégia do
+  projeto findhome.
+- **`__NEXT_DATA__`:** não existe mais nas páginas de busca (o findhome já registrava isso).
+- **Busca:** `/autos-e-pecas/carros-vans-e-utilitarios/{marca}/{modelo}/estado-pr/regiao-de-curitiba-e-paranagua?o={página}&pe={preço máx}`.
+  Se essa URL vier vazia, o adapter tenta sem a região e, por fim, a busca textual
+  `?q=marca modelo`. São 50 anúncios por página.
+- **Card:** título no padrão FIPE + ano ("Honda Fit LX 1.4/ 1.4 Flex 8v/16v 5P Mec. 2004");
+  `aria-label` "235000 quilômetros rodados", "Cor Cinza"; local "Curitiba, Xaxim"; data
+  "Hoje, 16:17". O câmbio vem do título: no padrão FIPE só as versões automáticas trazem "Aut.",
+  então sem "Aut." o câmbio é inferido como manual, e o anúncio confirma depois.
+- **Bloqueio:** o Cloudflare às vezes desafia uma requisição isolada. Nesse caso há **uma**
+  nova tentativa depois de ~60 s; se bloquear de novo, a execução para e é registrada. Nenhum
+  captcha é resolvido.
 
-## Checklist de investigação (por fonte)
+## Webmotors
 
-Para cada site, em ordem de preferência: (a) endpoint JSON do frontend → (b) JSON
-embutido (`__NEXT_DATA__` etc.) → (c) HTML → (d) Playwright.
+- **Busca:** `/carros/{uf}/{marca}/{modelo}?tipoveiculo=carros&estadocidade=Paraná&marca1=HONDA&modelo1=FIT&precoate=50000&anode=2009&page=N`.
+- **HTTP vs navegador:** de IP residencial a página vem com HTTP 200; de datacenter o
+  PerimeterX bloqueia. O adapter tenta HTTP e, se for barrado ou a página vier sem anúncios,
+  usa o Chromium no resto da execução.
+- **User-Agent do navegador:** usa a versão real do Chromium. Um UA "Chrome/128" num Chromium
+  153 é uma incoerência que o PerimeterX detecta.
+- **robots.txt:** para `User-agent: *`, só `/api/detail/` é proibido, e não o usamos. As
+  regras de `/comprar/` valem apenas para robôs de IA (GPTBot, ClaudeBot…).
+- As classes CSS são CSS Modules com hash (`vehicle-card-desktop_Container__RbTrf`), que muda a
+  cada deploy. Por isso o card é localizado pelo link do anúncio e lido por tag.
 
-- [ ] URL de busca e parâmetros (preço máx, ano mín, ordenação, região, câmbio, paginação)
-- [ ] `robots.txt` e termos de uso (o que é permitido)
-- [ ] Resposta a `httpx` com UA realista: 200, 403, challenge (Cloudflare/Akamai/PerimeterX)?
-- [ ] Existência de JSON embutido / endpoint XHR; campos disponíveis na listagem vs detalhe
-- [ ] Paginação, limite de páginas, total de resultados
-- [ ] Identificador estável do anúncio (id_externo)
-- [ ] Fotos (URLs), data de publicação, tipo de vendedor, km, câmbio, cor
+## FIPE
 
-## OLX (hipóteses)
-- Site em Next.js; a listagem costuma trazer JSON em `__NEXT_DATA__` (`props.pageProps.ads`).
-- Filtros via query string (`pe=` preço máx, `rs=` ano mín, `o=` página/ordenação — **a confirmar**).
-- Proteção anti-bot provável; se houver captcha/403 → parar e registrar (sem burlar).
+`https://fipe.parallelum.com.br/api/v2` é gratuita e funciona sem chave (um token gratuito
+aumenta a cota). Respostas ficam em `fipe_cache` por 15–30 dias. O casamento usa marca →
+modelos que começam com o nome do modelo → tokens da versão (cilindrada pesa mais) + câmbio →
+anos disponíveis.
 
-## Webmotors (hipóteses)
-- Frontend consome API JSON interna de busca (POST/GET com filtros) — **a confirmar na aba Network**.
-- Possível proteção anti-bot (Akamai/Cloudflare) e exigência de headers específicos.
-- Se a API exigir tokens/cookies de sessão gerados por JS, cair para Playwright só como fallback.
+## Comportamento educado
 
-## FIPE (hipótese)
-- API pública gratuita (ex.: parallelum "fipe.online" v2) com limite de requisições; cachear tudo em tabela.
+1 requisição a cada 3–5 s por host, com jitter; retry com backoff exponencial para 5xx/429;
+cache de respostas; no máximo `details.max_per_run` páginas de anúncio por execução (padrão 25);
+3 execuções por dia por padrão; imagens, fontes e mídia não são baixadas pelo navegador.
+
+## Como validar do servidor
+
+```bash
+docker compose exec app python -m app.cli probe olx        # busca + 1 detalhe
+docker compose exec app python -m app.cli probe webmotors
+```

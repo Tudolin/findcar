@@ -19,6 +19,20 @@ Implicação: o adapter precisa rodar a partir do homelab (IP residencial), em b
 Se o bloqueio persistir também de lá, a fonte fica desativada e marcada `blocked` em `/health`;
 não haverá tentativa de contornar o captcha nem fingerprinting.
 
+## Observado do homelab (IP residencial), 2026-10-06
+| fonte | resultado |
+|---|---|
+| OLX busca | **403** (Cloudflare), sem `__NEXT_DATA__` |
+| OLX `robots.txt` | **403** |
+| Webmotors busca `/carros/pr-curitiba?...` | **200**, contém `__NEXT_DATA__` → estratégia (b) |
+
+Decisões:
+- **Webmotors:** o adapter lê `__NEXT_DATA__` e localiza o array de anúncios por heurística
+  (objetos com `UniqueId` + `Specification`/`Prices`). O caminho exato ainda precisa ser
+  confirmado com uma amostra real (`python -m app.cli capture webmotors ...`).
+- **OLX:** fica desativada no seed. O adapter (para `props.pageProps.ads`) existe, mas não foi
+  validado. Reativar só se o `probe` passar sem bloqueio.
+
 ## Checklist de investigação (por fonte)
 
 Para cada site, em ordem de preferência: (a) endpoint JSON do frontend → (b) JSON

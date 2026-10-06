@@ -19,7 +19,8 @@ from app.services.config_store import set_setting
 from app.services.runner import run_search_source
 
 random.seed(7)
-MODELS = [("HONDA", "FIT", ["1.5 EX 16V FLEX 4P AUTOMÁTICO", "1.4 LX 16V FLEX 4P MANUAL", "1.5 EXL 16V FLEX 4P AUTOMÁTICO"], 11),
+MODELS = [("HONDA", "FIT", ["1.5 EX 16V FLEX 4P AUTOMÁTICO", "1.4 LX 16V FLEX 4P MANUAL",
+                           "1.5 EXL 16V FLEX 4P AUTOMÁTICO"], 11),
           ("HONDA", "CITY", ["1.5 EX 16V FLEX 4P AUTOMÁTICO", "1.5 LX 16V FLEX 4P MANUAL"], 6),
           ("HYUNDAI", "HB20", ["1.0 COMFORT PLUS 12V FLEX 4P MANUAL", "1.6 COMFORT STYLE 16V FLEX 4P AUTOMÁTICO"], 12),
           ("HYUNDAI", "HB20S", ["1.6 C.STYLE 16V FLEX 4P AUTOMÁTICO"], 5),
@@ -84,7 +85,8 @@ def main():
             li.first_seen = utcnow() - timedelta(days=100)
             s.add(li)
         vs = s.exec(select(Vehicle).order_by(Vehicle.score.desc())).all()
-        for v, stage in zip(vs[:6], ["interessante", "interessante", "contatado", "visitado", "novo", "descartado"]):
+        stages = ["interessante", "interessante", "contatado", "visitado", "novo", "descartado"]
+        for v, stage in zip(vs[:6], stages, strict=False):
             v.stage = stage
             v.favorite = stage in {"contatado", "visitado"}
             s.add(v)

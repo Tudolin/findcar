@@ -1,4 +1,9 @@
-# carwatch — proposta de arquitetura e schema (v0, para aprovação)
+# carwatch — arquitetura e schema
+
+> Implementado. Os nomes finais das tabelas estão em `app/models/__init__.py`; as diferenças em relação à proposta estão abaixo.
+> Diferenças: sem tabela `source` (há `source_status`), `search_hit` liga busca↔anúncio para detectar vendidos
+> por busca, `app_setting` (chave/valor) guarda pesos/alertas/agenda, `vehicle_match` virou colunas
+> `match_confidence`/`match_manual` em `listing`, e `model_spec` guarda o consumo aproximado.
 
 ## Serviços (docker-compose, projeto `carwatch`)
 | serviço | função | porta |

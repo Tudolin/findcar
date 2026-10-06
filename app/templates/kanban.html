@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon %}
+{% block title %}Decisão{% endblock %}
+{% block head %}<script src="/static/vendor/sortable.min.js" defer></script>{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Decisão</h1><p>Arraste os cards entre as etapas. “Novo” mostra só ativos com score ≥ 50 ou favoritos.</p></div>
+</div>
+<div class="board">
+  {% for stage, items in cols.items() %}
+  <section class="col">
+    <div class="col-head"><span>{{ STAGE_LABELS[stage] }}</span><span class="badge">{{ items|length }}</span></div>
+    <div class="col-list" data-stage="{{ stage.value }}">
+      {% for v in items %}
+      <a class="kcard" href="/vehicles/{{ v.id }}" data-id="{{ v.id }}" style="{{ 'opacity:.6' if not v.active }}">
+        {% if photos.get(v.id) %}<img src="{{ photos[v.id] }}" referrerpolicy="no-referrer" alt="">{% else %}<div class="ph"></div>{% endif %}
+        <div style="min-width:0">
+          <div class="t">{{ v.brand }} {{ v.model }} {{ v.year_model or "" }}</div>
+          <div class="tiny muted num">{{ v.price|brl }} · {{ v.km|km }}</div>
+          <div class="row mt-s" style="gap:4px">
+            <span class="score {{ v.score|score_class }}" style="height:20px;min-width:30px;font-size:11.5px">{{ v.score if v.score is not none else "–" }}</span>
+            {% if v.favorite %}<span class="badge mid">★</span>{% endif %}
+            {% if v.notes %}<span class="badge" title="{{ v.notes[:200] }}">notas</span>{% endif %}
+            {% if not v.active %}<span class="badge bad">inativo</span>{% endif %}
+          </div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+    {% if stage.value == "novo" and hidden_new %}<a class="small link" style="padding:4px 6px" href="/vehicles?stage=novo">+ {{ hidden_new }} em Veículos</a>{% endif %}
+  </section>
+  {% endfor %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+window.addEventListener("load", () => {
+  document.querySelectorAll(".col-list").forEach((el) => {
+    new Sortable(el, {
+      group: "kanban", animation: 150, ghostClass: "sortable-ghost",
+      onAdd: async (evt) => {
+        const id = evt.item.dataset.id, stage = evt.to.dataset.stage;
+        const body = new URLSearchParams({ stage });
+        const r = await fetch(`/vehicles/${id}/stage`, { method: "POST", body });
+        cwToast(r.ok ? "Etapa atualizada" : "Erro ao mover", r.ok ? "ok" : "err");
+        document.querySelectorAll(".col").forEach((c) => {
+          c.querySelector(".badge").textContent = c.querySelectorAll(".kcard").length;
+        });
+      },
+    });
+  });
+});
+</script>
+{% endblock %}

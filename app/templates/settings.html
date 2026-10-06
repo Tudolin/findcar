@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon %}
+{% block title %}Configurações{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Configurações</h1><p>Score, alertas, agenda, fontes e normalização</p></div></div>
+
+<div class="row wrap" style="margin-bottom:16px;gap:6px">
+  {% for a, l in [("score","Score"),("flags","Red flags"),("alertas","Alertas"),("agenda","Agenda"),("fontes","Fontes"),("consumo","Consumo"),("aliases","Aliases")] %}
+  <a class="btn sm" href="#{{ a }}">{{ l }}</a>{% endfor %}
+</div>
+
+<div class="stack" style="gap:16px;max-width:980px">
+<form id="score" method="post" action="/settings/score" class="card">
+  <div class="card-head"><div><h2>Pesos do score</h2><div class="small muted">Pesos relativos; critérios sem dado são ignorados e o restante é reescalado para 100.</div></div><button class="btn primary sm">Salvar e recalcular</button></div>
+  <div class="card-pad form-grid">
+    {% set labels = {"price_fipe": "Preço vs FIPE", "km_year": "Km por ano", "age": "Idade", "transmission": "Câmbio automático", "seller": "Vendedor", "consumption": "Consumo"} %}
+    {% for k, w in weights.items() %}<label class="field">{{ labels.get(k, k) }}<input type="number" min="0" max="100" name="w_{{ k }}" value="{{ w }}"></label>{% endfor %}
+    <label class="field">Valor “particular” (0–1)<input name="seller_particular" value="{{ seller_values.particular }}"></label>
+    <label class="field">Valor “loja” (0–1)<input name="seller_loja" value="{{ seller_values.loja }}"></label>
+    <label class="field">Penalidade Powershift inferido<input type="number" name="inf_powershift" value="{{ inferred.powershift }}"></label>
+    <label class="field">Penalidade AL4 inferido<input type="number" name="inf_al4" value="{{ inferred.al4 }}"></label>
+  </div>
+</form>
+
+<div id="flags" class="card">
+  <div class="card-head"><div><h2>Red flags</h2><div class="small muted">Regex (sem diferenciar maiúsculas) aplicada ao título, versão e descrição. Cada ocorrência desconta pontos.</div></div></div>
+  <div class="table-wrap"><table class="t compact">
+    <thead><tr><th>Rótulo</th><th>Padrão</th><th class="right">Penalidade</th><th></th></tr></thead>
+    <tbody>
+    {% for r in flags %}
+      <tr style="{{ 'opacity:.5' if not r.enabled }}">
+        <td>{{ r.label }}</td><td class="mono">{{ r.pattern }}</td><td class="right num">−{{ r.penalty }}</td>
+        <td class="right nowrap">
+          <form method="post" action="/settings/flags/{{ r.id }}/toggle" style="display:inline"><button class="btn sm ghost">{{ "Desativar" if r.enabled else "Ativar" }}</button></form>
+          <form method="post" action="/settings/flags/{{ r.id }}/delete" style="display:inline"><button class="btn sm ghost danger icon">{{ icon("trash") }}</button></form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  <form method="post" action="/settings/flags" class="card-pad row wrap" style="border-top:1px solid var(--border);align-items:end">
+    <label class="field grow">Rótulo<input name="label" required placeholder="Ex.: Teto solar com infiltração"></label>
+    <label class="field grow">Regex<input name="pattern" required class="mono" placeholder="infiltra"></label>
+    <label class="field" style="width:110px">Penalidade<input type="number" name="penalty" value="10"></label>
+    <button class="btn">{{ icon("plus") }} Adicionar</button>
+  </form>
+</div>
+
+<form id="alertas" method="post" action="/settings/alerts" class="card">
+  <div class="card-head"><div><h2>Alertas no Telegram</h2><div class="small muted">{% if telegram %}<span class="pos">Bot configurado</span>{% else %}<span class="neg">Defina TELEGRAM_BOT_TOKEN e TELEGRAM_CHAT_ID no .env</span>{% endif %}</div></div>
+    <div class="row"><button class="btn sm" formaction="/settings/telegram-test">Enviar teste</button><button class="btn primary sm">Salvar</button></div></div>
+  <div class="card-pad form-grid">
+    <label class="field">Anúncio novo com score ≥<input type="number" name="min_score" value="{{ alerts.min_score }}"></label>
+    <label class="field">Queda de preço ≥ (%)<input name="drop_pct" value="{{ alerts.drop_pct }}"></label>
+    <label class="field">… ou queda ≥ (R$)<input type="number" name="drop_abs" value="{{ alerts.drop_abs }}"></label>
+    <label class="field">Horário do resumo diário<input type="time" name="daily_summary_time" value="{{ alerts.daily_summary_time }}"></label>
+    <label class="check"><input type="checkbox" name="favorite_inactive" {{ 'checked' if alerts.favorite_inactive }}> Avisar quando favorito ficar inativo</label>
+    <label class="check"><input type="checkbox" name="daily_summary" {{ 'checked' if alerts.daily_summary }}> Resumo diário</label>
+  </div>
+</form>
+
+<form id="agenda" method="post" action="/settings/schedule" class="card">
+  <div class="card-head"><div><h2>Agenda e comportamento</h2><div class="small muted">Poucas execuções por dia; cada requisição respeita 3–5 s de intervalo.</div></div><button class="btn primary sm">Salvar</button></div>
+  <div class="card-pad form-grid">
+    <label class="field">Horários (HH:MM, separados por vírgula)<input name="times" value="{{ schedule.times|join(', ') }}"></label>
+    <label class="field">Inativar após N execuções sem aparecer<input type="number" min="1" name="inactive_after" value="{{ inactive_after }}"></label>
+    <label class="field">Revalidar FIPE a cada (dias)<input type="number" min="1" name="fipe_refresh_days" value="{{ schedule.fipe_refresh_days }}"></label>
+    <label class="field">Detalhes/fotos por execução (máx.)<input type="number" min="0" name="max_details" value="{{ details.max_per_run }}"></label>
+    <label class="field">Dedup: unir automaticamente ≥<input name="auto_threshold" value="{{ dedupe.auto_threshold }}"></label>
+    <label class="field">Dedup: sugerir ≥<input name="suggest_threshold" value="{{ dedupe.suggest_threshold }}"></label>
+    <label class="check"><input type="checkbox" name="photo_hash" {{ 'checked' if dedupe.photo_hash }}> Comparar 1ª foto (hash perceptual)</label>
+  </div>
+</form>
+
+<div id="fontes" class="card">
+  <div class="card-head"><div><h2>Fontes</h2><div class="small muted">Fonte bloqueada (anti-bot/captcha) para a execução e fica registrada; não há tentativa de contornar.</div></div><a class="btn sm" href="/health">Ver saúde</a></div>
+  {% for s in sources %}
+  <div class="listing-row">
+    <span class="dot {{ s.last_status or '' }}"></span>
+    <div class="grow"><b>{{ SOURCE_LABELS.get(s.name, s.name) }}</b> <span class="small muted">· {{ "ativa" if s.enabled else "desativada" }} · última: {{ s.last_run_at|ago }}</span>
+      {% if s.last_error %}<div class="tiny neg">{{ s.last_error }}</div>{% endif %}</div>
+    <form method="post" action="/sources/{{ s.name }}/toggle"><button class="btn sm">{{ "Desativar" if s.enabled else "Ativar" }}</button></form>
+  </div>
+  {% endfor %}
+</div>
+
+<form id="consumo" method="post" action="/settings/specs" class="card">
+  <div class="card-head"><div><h2>Consumo por modelo</h2><div class="small muted">km/l com gasolina — valores aproximados, ajuste à vontade.</div></div><button class="btn primary sm">Salvar</button></div>
+  <div class="table-wrap"><table class="t compact">
+    <thead><tr><th>Modelo</th><th>Cidade</th><th>Estrada</th></tr></thead>
+    <tbody>
+    {% for s in specs %}<tr><td>{{ s.brand }} {{ s.model }}</td><td><input name="city_{{ s.id }}" value="{{ s.consumption_city or '' }}" style="max-width:110px"></td><td><input name="road_{{ s.id }}" value="{{ s.consumption_road or '' }}" style="max-width:110px"></td></tr>{% endfor %}
+    <tr><td class="row"><input name="new_brand" placeholder="Marca" style="max-width:120px"><input name="new_model" placeholder="Modelo" style="max-width:140px"></td><td><input name="new_city" placeholder="km/l" style="max-width:110px"></td><td><input name="new_road" placeholder="km/l" style="max-width:110px"></td></tr>
+    </tbody>
+  </table></div>
+</form>
+
+<div id="aliases" class="card">
+  <div class="card-head"><div><h2>Aliases de marca/modelo/versão</h2><div class="small muted">Texto bruto (normalizado) → nome canônico. Ex.: “c style” → “comfort style”.</div></div></div>
+  <details class="section"><summary class="card-pad small link">Mostrar {{ aliases|length }} aliases</summary>
+  <div class="table-wrap"><table class="t compact">
+    <thead><tr><th>Tipo</th><th>Texto</th><th>Canônico</th><th>Marca</th><th></th></tr></thead>
+    <tbody>{% for a in aliases %}<tr><td><span class="badge">{{ a.kind }}</span></td><td class="mono">{{ a.pattern }}</td><td>{{ a.canonical }}</td><td class="muted">{{ a.brand or "" }}</td>
+      <td class="right"><form method="post" action="/settings/aliases/{{ a.id }}/delete"><button class="btn sm ghost icon danger">{{ icon("trash") }}</button></form></td></tr>{% endfor %}</tbody>
+  </table></div></details>
+  <form method="post" action="/settings/aliases" class="card-pad row wrap" style="border-top:1px solid var(--border);align-items:end">
+    <label class="field" style="width:130px">Tipo<select name="kind"><option value="version">versão</option><option value="model">modelo</option><option value="brand">marca</option></select></label>
+    <label class="field grow">Texto bruto<input name="pattern" required placeholder="c style"></label>
+    <label class="field grow">Canônico<input name="canonical" required placeholder="comfort style"></label>
+    <label class="field" style="width:140px">Marca (opcional)<input name="brand" placeholder="Hyundai"></label>
+    <button class="btn">{{ icon("plus") }} Adicionar</button>
+  </form>
+</div>
+</div>
+{% endblock %}

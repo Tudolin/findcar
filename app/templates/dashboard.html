@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon, vehicle_card %}
+{% block title %}Dashboard{% endblock %}
+{% block head %}<script src="/static/vendor/chart.umd.min.js" defer></script>{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Dashboard</h1><p>Visão geral do mercado monitorado</p></div>
+  <form method="post" action="/run-all"><button class="btn primary" {{ 'disabled' if running }}>{{ icon("play") }} {{ "Executando…" if running else "Executar buscas agora" }}</button></form>
+</div>
+
+<section class="grid grid-kpi">
+  <div class="card kpi"><div class="label">Veículos ativos</div><div class="value num">{{ kpis.active }}</div></div>
+  <div class="card kpi"><div class="label">Novos em 24h</div><div class="value num">{{ kpis.new_24h }}</div></div>
+  <div class="card kpi"><div class="label">Quedas de preço (7 dias)</div><div class="value num">{{ kpis.drops_7d }}</div></div>
+  <div class="card kpi"><div class="label">Abaixo da FIPE</div><div class="value num pos">{{ kpis.below_fipe }}</div></div>
+  <div class="card kpi"><div class="label">Favoritos</div><div class="value num">{{ kpis.favorites }}</div></div>
+</section>
+
+<section class="grid grid-3-1 mt">
+  <div class="card flexcol" x-data="medianChart()">
+    <div class="card-head">
+      <div><h2>Preço mediano anunciado</h2><div class="small muted">Mediana semanal · <span x-text="model ? 'por ano-modelo' : 'por modelo'"></span></div></div>
+      <select style="width:auto" x-model="model" @change="load()">
+        <option value="">Todos os modelos</option>
+        {% for m in models %}<option value="{{ m }}">{{ m }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="chart-box"><canvas x-ref="c"></canvas>
+      <div class="empty" x-show="empty" x-cloak style="position:absolute;inset:0">Ainda sem histórico suficiente.</div></div>
+  </div>
+  <div class="card">
+    <div class="card-head"><h2>Anúncios ativos por fonte</h2></div>
+    <div class="chart-box" style="height:220px"><canvas id="bySource"></canvas></div>
+    <div class="card-head" style="border-top:1px solid var(--border)"><h2>Últimas execuções</h2><a href="/health" class="small link">ver tudo</a></div>
+    <div>
+      {% for r in runs %}
+      <div class="listing-row small">
+        <span class="dot {{ r.status }}"></span>
+        <span class="grow"><b>{{ SOURCE_LABELS.get(r.source, r.source) }}</b> <span class="muted">· {{ r.started_at|ago }}</span></span>
+        <span class="muted num">{{ r.n_found }} encontrados · {{ r.n_new }} novos</span>
+      </div>
+      {% else %}<div class="empty small">Nenhuma execução ainda.</div>{% endfor %}
+    </div>
+  </div>
+</section>
+
+<section class="grid grid-2 mt">
+  <div class="card">
+    <div class="card-head"><h2>Distribuição de km</h2><span class="small muted">veículos ativos</span></div>
+    <div class="chart-box"><canvas id="kmHist"></canvas></div>
+  </div>
+  <div class="card">
+    <div class="card-head"><h2>Melhores oportunidades</h2><a class="small link" href="/vehicles?sort=score">ver lista</a></div>
+    <table class="t compact">
+      <tbody>
+      {% for v in top %}
+        <tr>
+          <td style="width:64px">{% if photos.get(v.id) %}<img src="{{ photos[v.id] }}" referrerpolicy="no-referrer" style="width:56px;height:40px;object-fit:cover;border-radius:6px">{% endif %}</td>
+          <td><a href="/vehicles/{{ v.id }}"><b>{{ v.brand }} {{ v.model }}</b> <span class="muted">{{ v.year_model }}</span><div class="tiny muted">{{ v.km|km }} · {{ TRANSMISSION.get(v.transmission, "—") }}</div></a></td>
+          <td class="right num"><b>{{ v.price|brl }}</b><div class="tiny {{ v.fipe_diff_pct|fipe_class }}">{{ v.fipe_diff_pct|pct }} FIPE</div></td>
+          <td class="right"><span class="score {{ v.score|score_class }}">{{ v.score if v.score is not none else "–" }}</span></td>
+        </tr>
+      {% else %}<tr><td class="empty">Sem veículos ainda — rode uma busca.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>
+const MEDIAN = {{ median|tojson }};
+const KMH = {{ kmh|tojson }};
+const BYSRC = {{ by_source|tojson }};
+function medianChart() {
+  return {
+    model: "", chart: null, empty: false,
+    init() {  // Alpine calls init() automatically
+      if (document.readyState === "complete") this.draw(MEDIAN);
+      else window.addEventListener("load", () => this.draw(MEDIAN), { once: true });
+    },
+    async load() {
+      const r = await fetch("/api/median?model=" + encodeURIComponent(this.model));
+      this.draw(await r.json());
+    },
+    draw(d) {
+      cwChartDefaults();
+      const keys = Object.keys(d.series);
+      this.empty = keys.length === 0;
+      const datasets = keys.map((k, i) => ({
+        label: k, data: d.series[k], borderColor: cwPalette[i % cwPalette.length],
+        backgroundColor: cwPalette[i % cwPalette.length], tension: .3, spanGaps: true, pointRadius: 2, borderWidth: 2,
+      }));
+      if (this.chart) this.chart.destroy();
+      this.chart = new Chart(this.$refs.c, {
+        type: "line", data: { labels: d.labels, datasets },
+        options: { interaction: { mode: "index", intersect: false },
+          scales: { y: { ticks: { callback: (v) => cwBRL(v) } }, x: { grid: { display: false } } },
+          plugins: { tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${cwBRL(c.parsed.y)}` } } } },
+      });
+    },
+  };
+}
+window.addEventListener("load", () => {
+  cwChartDefaults();
+  new Chart(document.getElementById("kmHist"), {
+    type: "bar",
+    data: { labels: KMH.labels, datasets: [{ label: "Veículos", data: KMH.counts, backgroundColor: cwCss("--accent"), borderRadius: 6 }] },
+    options: { plugins: { legend: { display: false } }, scales: { x: { grid: { display: false } }, y: { ticks: { precision: 0 } } } },
+  });
+  new Chart(document.getElementById("bySource"), {
+    type: "doughnut",
+    data: { labels: BYSRC.labels.map((s) => ({olx: "OLX", webmotors: "Webmotors"})[s] || s),
+            datasets: [{ data: BYSRC.counts, backgroundColor: cwPalette, borderWidth: 0 }] },
+    options: { cutout: "68%", plugins: { legend: { position: "bottom" } } },
+  });
+});
+</script>
+{% endblock %}

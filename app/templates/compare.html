@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon, score %}
+{% block title %}Comparar{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Comparativo</h1><p>Até 6 veículos lado a lado — o melhor valor de cada linha fica destacado</p></div>
+  {% if data.cols %}
+  <div class="row">
+    <a class="btn" href="/compare.csv?ids={{ ids }}">{{ icon("download") }} Exportar CSV</a>
+  </div>
+  {% endif %}
+</div>
+<div x-data x-init="
+  const want = $store.cmp.ids.join(',');
+  if (!'{{ ids }}' && want) location.replace($store.cmp.url());">
+</div>
+{% if not data.cols %}
+<div class="card empty">{{ icon("scale") }}<div>Nenhum veículo selecionado.</div>
+  <div class="small mt-s">Marque “Comparar” nos cards em <a class="link" href="/vehicles">Veículos</a>.</div></div>
+{% else %}
+<div class="card table-wrap">
+  <table class="t cmp">
+    <thead><tr>
+      <th class="rowlabel"></th>
+      {% for c in data.cols %}{% set v = c.vehicle %}
+      <th style="white-space:normal;vertical-align:top;background:var(--surface)">
+        <div class="stack" style="gap:6px">
+          {% if photos.get(v.id) %}<img src="{{ photos[v.id] }}" referrerpolicy="no-referrer" style="width:100%;aspect-ratio:16/10;object-fit:cover;border-radius:8px">{% endif %}
+          <a href="/vehicles/{{ v.id }}" style="color:var(--text);font-size:13.5px">{{ v.brand }} {{ v.model }} {{ v.year_model or "" }}</a>
+          <span class="tiny muted" style="font-weight:400">{{ v.version or "" }}</span>
+          <button class="btn sm ghost" @click="$store.cmp.toggle({{ v.id }}); location.href = $store.cmp.url()">{{ icon("x") }} Remover</button>
+        </div>
+      </th>
+      {% endfor %}
+    </tr></thead>
+    <tbody>
+    {% for r in data.rows %}
+      <tr>
+        <th class="rowlabel">{{ r.label }}</th>
+        {% for c in data.cols %}{% set val = c[r.key] %}
+        <td class="num {{ 'best' if r.key in data.best and val == data.best[r.key] }}">
+          {% if r.fmt == "links" %}
+            <div class="stack" style="gap:4px">{% for src, url, active in val %}<a class="link small" href="{{ url }}" target="_blank" rel="noopener noreferrer">{{ SOURCE_LABELS.get(src, src) }}{% if not active %} (inativo){% endif %} ↗</a>{% endfor %}</div>
+          {% elif r.key == "score" %}{{ score(val) }}
+          {% elif val is none %}<span class="faint">—</span>
+          {% elif r.fmt == "brl" %}{{ val|brl }}
+          {% elif r.fmt == "km" %}{{ val|km }}
+          {% elif r.fmt == "pct" %}{{ val|pct }}
+          {% elif r.fmt == "num" %}{{ val|num(1) }}
+          {% elif r.key == "transmission" %}{{ TRANSMISSION.get(val, val) }}
+          {% else %}{{ val }}{% endif %}
+        </td>
+        {% endfor %}
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}

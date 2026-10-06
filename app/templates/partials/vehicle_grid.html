@@ -1,0 +1,9 @@
+{% from "macros.html" import icon, vehicle_card %}
+<div class="row between" style="margin-bottom:12px"><span class="small muted">{{ vehicles|length }} veículo{{ 's' if vehicles|length != 1 }}{% if vehicles|length >= 300 %} (limite de 300 — refine os filtros){% endif %}</span></div>
+{% if vehicles %}
+<div class="vgrid">
+  {% for v in vehicles %}{{ vehicle_card(v, photos.get(v.id), sources.get(v.id, [])) }}{% endfor %}
+</div>
+{% else %}
+<div class="card empty">{{ icon("search") }}<div>Nenhum veículo com esses filtros.</div><div class="small mt-s">Ajuste os filtros ou <a class="link" href="/searches">rode uma busca</a>.</div></div>
+{% endif %}

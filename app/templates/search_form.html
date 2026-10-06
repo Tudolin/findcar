@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}{{ "Editar busca" if s else "Nova busca" }}{% endblock %}
+{% block content %}
+{% set f = s.filters if s else {"models": [], "max_price": 50000, "min_year": 2009, "state": "pr", "city": "curitiba", "cities": rmc, "max_pages": 3} %}
+<div class="page-head"><div><div class="small muted"><a class="link" href="/searches">Buscas</a></div><h1 class="mt-s">{{ "Editar busca" if s else "Nova busca" }}</h1></div></div>
+<form method="post" action="{{ '/searches/%d' % s.id if s else '/searches' }}" class="card card-pad stack" style="max-width:860px">
+  <div class="form-grid">
+    <label class="field" style="grid-column:1/-1">Nome<input name="name" required value="{{ s.name if s else '' }}" placeholder="Ex.: Automáticos até 45 mil"></label>
+    <label class="field">Preço máximo (R$)<input name="max_price" type="number" step="500" value="{{ f.max_price or '' }}"></label>
+    <label class="field">Ano mínimo<input name="min_year" type="number" value="{{ f.min_year or '' }}"></label>
+    <label class="field">Km máximo<input name="max_km" type="number" step="5000" value="{{ f.max_km or '' }}" placeholder="sem limite"></label>
+    <label class="field">Páginas por modelo/fonte<input name="max_pages" type="number" min="1" max="10" value="{{ f.max_pages or 3 }}"></label>
+    <label class="field">UF<input name="state" value="{{ f.state or 'pr' }}" maxlength="2"></label>
+    <label class="field">Cidade-base (URL)<input name="city" value="{{ f.city or 'curitiba' }}"></label>
+  </div>
+  <label class="field">Modelos — um por linha: <span class="mono">Marca Modelo</span>
+    <textarea name="models" rows="7" class="mono">{% for m in f.models %}{{ m.brand }} {{ m.model }}
+{% endfor %}</textarea></label>
+  <label class="field">Cidades aceitas (uma por linha; vazio = qualquer cidade da UF)
+    <textarea name="cities" rows="5">{{ (f.cities or [])|join("\n") }}</textarea></label>
+  <div class="row wrap" style="gap:18px">
+    <label class="check"><input type="checkbox" name="automatic_only" {{ 'checked' if f.automatic_only }}> Só câmbio automático</label>
+    <label class="check"><input type="checkbox" name="sources" value="webmotors" {{ 'checked' if not s or 'webmotors' in s.sources }}> Webmotors</label>
+    <label class="check"><input type="checkbox" name="sources" value="olx" {{ 'checked' if s and 'olx' in s.sources }}> OLX</label>
+    <label class="check"><input type="checkbox" name="enabled" {{ 'checked' if not s or s.enabled }}> Ativa no agendador</label>
+  </div>
+  <div class="callout small">Os filtros também são aplicados localmente depois da coleta, então resultados fora do critério nunca entram, mesmo que o site os devolva.</div>
+  <div class="row"><button class="btn primary">Salvar</button><a class="btn ghost" href="/searches">Cancelar</a></div>
+</form>
+{% endblock %}

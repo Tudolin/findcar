@@ -1,0 +1,3 @@
+<button class="fav {{ 'on' if v.favorite }}" hx-post="/vehicles/{{ v.id }}/favorite" hx-swap="outerHTML" title="{{ 'Remover dos favoritos' if v.favorite else 'Favoritar' }}" aria-pressed="{{ 'true' if v.favorite else 'false' }}">
+  <svg viewBox="0 0 24 24" fill="{{ 'currentColor' if v.favorite else 'none' }}" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1 6.2L12 17.3 6.5 20.2l1-6.2L3 9.6l6.2-.9z"/></svg>
+</button>

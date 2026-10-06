@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon %}
+{% block title %}Saúde{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Saúde</h1><p>Status de cada fonte e histórico de execuções · JSON em <a class="link mono" href="/health.json">/health.json</a></p></div>
+  <form method="post" action="/run-all"><button class="btn primary" {{ 'disabled' if running }}>{{ icon("play") }} {{ "Executando…" if running else "Executar agora" }}</button></form>
+</div>
+<div class="grid grid-kpi">
+  {% for s in sources %}
+  <div class="card card-pad">
+    <div class="row between"><h2>{{ SOURCE_LABELS.get(s.name, s.name) }}</h2>
+      {% if not s.enabled %}<span class="badge">desativada</span>{% elif s.last_status == "ok" %}<span class="badge good">ok</span>{% elif s.last_status == "blocked" %}<span class="badge mid">bloqueada</span>{% elif s.last_status == "error" %}<span class="badge bad">erro</span>{% else %}<span class="badge">sem execução</span>{% endif %}</div>
+    <div class="small muted mt-s">Última execução: <b>{{ s.last_run_at|dt }}</b><br>Último sucesso: {{ s.last_success_at|dt }}<br>Anúncios na última: <b class="num">{{ s.last_count }}</b>
+      {% if s.blocked_since %}<br>Bloqueada desde {{ s.blocked_since|dt }}{% endif %}</div>
+    {% if s.last_error %}<div class="callout {{ 'warn' if s.last_status == 'blocked' else 'bad' }} mt-s">{{ s.last_error }}</div>{% endif %}
+  </div>
+  {% endfor %}
+  <div class="card card-pad">
+    <div class="row between"><h2>Agendador</h2>{% if running %}<span class="badge info"><span class="dot running"></span> rodando</span>{% endif %}</div>
+    <div class="small muted mt-s">Próximas execuções:<br>{% for t in next_runs[:4] %}<b>{{ t.strftime("%d/%m %H:%M") }}</b><br>{% else %}<span class="faint">agendador desligado</span>{% endfor %}
+      Telegram: {% if telegram %}<span class="pos">configurado</span>{% else %}<span class="neg">não configurado</span>{% endif %}</div>
+  </div>
+</div>
+<div class="card mt">
+  <div class="card-head"><h2>Execuções recentes</h2></div>
+  <div class="table-wrap"><table class="t compact">
+    <thead><tr><th></th><th>Início</th><th>Fonte</th><th>Busca</th><th class="right">Encontrados</th><th class="right">Novos</th><th class="right">Preço mudou</th><th class="right">Inativados</th><th>Duração</th><th>Erro</th></tr></thead>
+    <tbody>
+    {% for r in runs %}
+      <tr><td><span class="dot {{ r.status }}"></span></td><td class="nowrap">{{ r.started_at|dt }}</td><td>{{ SOURCE_LABELS.get(r.source, r.source) }}</td><td class="muted">#{{ r.saved_search_id or "—" }}</td>
+        <td class="right num">{{ r.n_found }}</td><td class="right num">{{ r.n_new }}</td><td class="right num">{{ r.n_price_changes }}</td><td class="right num">{{ r.n_inactivated }}</td>
+        <td class="num muted">{% if r.finished_at %}{{ ((r.finished_at - r.started_at).total_seconds())|round|int }} s{% else %}…{% endif %}</td>
+        <td class="small neg" style="max-width:360px">{{ r.error or "" }}</td></tr>
+    {% else %}<tr><td colspan="10" class="empty">Nenhuma execução registrada.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</div>
+{% endblock %}

@@ -1,0 +1,49 @@
+{% from "macros.html" import icon %}<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}carwatch{% endblock %} · carwatch</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%234f46e5'/><path d='M7 20h18M6 20v-4l2-5h16l2 5v4' stroke='white' stroke-width='2.2' fill='none' stroke-linejoin='round'/></svg>">
+  <link rel="stylesheet" href="/static/css/app.css">
+  <script src="/static/js/app.js"></script>
+  <script src="/static/vendor/htmx.min.js" defer></script>
+  <script src="/static/vendor/alpine.min.js" defer></script>
+  {% block head %}{% endblock %}
+</head>
+<body hx-boost="false" x-data>
+<div class="shell">
+  <aside class="sidebar">
+    <a href="/" class="brand"><span class="brand-mark">{{ icon("car") }}</span><span>carwatch</span></a>
+    <nav class="nav stack" style="gap:2px">
+      {% set items = [("dashboard","/","grid","Dashboard"),("vehicles","/vehicles","car","Veículos"),("kanban","/kanban","kanban","Decisão"),("compare","/compare","scale","Comparar"),("searches","/searches","search","Buscas"),("health","/health","pulse","Saúde"),("settings","/settings","sliders","Configurações")] %}
+      {% for key, href, ic, label in items %}
+        <a href="{{ href }}{% if key == 'compare' %}{% endif %}" class="{{ 'active' if nav == key }}"
+           {% if key == 'compare' %}:href="$store.cmp.url()"{% endif %}>{{ icon(ic) }}<span>{{ label }}</span>
+           {% if key == 'compare' %}<span class="badge accent" x-show="$store.cmp.ids.length" x-text="$store.cmp.ids.length" x-cloak style="margin-left:auto"></span>{% endif %}
+        </a>
+      {% endfor %}
+    </nav>
+    <div class="foot">
+      <button class="btn ghost icon" onclick="cwCycleTheme()" title="Tema: automático / claro / escuro">{{ icon("theme") }}</button>
+      <span class="tiny faint">v0.1</span>
+    </div>
+  </aside>
+  <main class="main">
+    {% block content %}{% endblock %}
+  </main>
+</div>
+
+<div class="tray" x-show="$store.cmp.ids.length && !location.pathname.startsWith('/compare')" x-cloak x-transition>
+  <span class="small"><b x-text="$store.cmp.ids.length"></b>/6 para comparar</span>
+  <button class="btn ghost sm" @click="$store.cmp.clear()">Limpar</button>
+  <a class="btn primary sm" :href="$store.cmp.url()">{{ icon("scale") }} Comparar</a>
+</div>
+<div class="toasts">
+  <template x-for="t in $store.toasts.items" :key="t.id">
+    <div class="toast" :class="t.kind === 'err' && 'err'" x-text="t.msg" x-transition></div>
+  </template>
+</div>
+{% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon %}
+{% block title %}Buscas{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Buscas salvas</h1><p>Cada busca ativa roda nos horários definidos em Configurações</p></div>
+  <a class="btn primary" href="/searches/new">{{ icon("plus") }} Nova busca</a>
+</div>
+{% for s in searches %}
+<div class="card card-pad" style="margin-bottom:12px">
+  <div class="row between wrap">
+    <div class="grow">
+      <div class="row"><h2>{{ s.name }}</h2>{% if s.enabled %}<span class="badge good">ativa</span>{% else %}<span class="badge">pausada</span>{% endif %}</div>
+      <div class="small muted mt-s">
+        {{ s.filters.models|map(attribute="model")|join(", ") }}
+        · até {{ s.filters.max_price|brl }} · ano ≥ {{ s.filters.min_year or "—" }}
+        {% if s.filters.max_km %}· km ≤ {{ s.filters.max_km|km }}{% endif %}
+        {% if s.filters.automatic_only %}· só automático{% endif %}
+        · {{ s.filters.state|upper }}{% if s.filters.cities %} ({{ s.filters.cities|length }} cidades){% endif %}
+      </div>
+      <div class="row wrap mt-s">
+        {% for src in s.sources %}{% set st = source_status.get(src) %}
+        <span class="badge {{ 'bad' if st and not st.enabled else 'info' }}" title="{{ st.last_error if st and st.last_error else '' }}">{{ SOURCE_LABELS.get(src, src) }}{% if st and not st.enabled %} · desativada{% endif %}</span>
+        {% endfor %}
+        <span class="tiny faint">última execução: {{ s.last_run_at|ago }}</span>
+      </div>
+    </div>
+    <div class="row">
+      <form method="post" action="/searches/{{ s.id }}/run"><button class="btn" {{ 'disabled' if running }}>{{ icon("play") }} Rodar agora</button></form>
+      <a class="btn" href="/searches/{{ s.id }}/edit">{{ icon("edit") }} Editar</a>
+      <form method="post" action="/searches/{{ s.id }}/delete" onsubmit="return confirm('Remover esta busca? Os anúncios já coletados são mantidos.')"><button class="btn icon ghost danger" title="Remover">{{ icon("trash") }}</button></form>
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="card empty">{{ icon("search") }}<div>Nenhuma busca salva.</div></div>
+{% endfor %}
+{% endblock %}

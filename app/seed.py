@@ -100,9 +100,8 @@ def seed(session: Session) -> None:
     if session.get(SourceStatus, "webmotors") is None:
         session.add(SourceStatus(name="webmotors", enabled=True))
     if session.get(SourceStatus, "olx") is None:
-        # 403 Cloudflare from residential IP on 2026-10-06 → disabled until verified.
-        session.add(SourceStatus(name="olx", enabled=False, last_status="blocked",
-                                 last_error="403 Cloudflare na investigação (docs/sources.md)"))
+        # Read through headless Chromium (plain HTTP gets Cloudflare 403) — see docs/sources.md.
+        session.add(SourceStatus(name="olx", enabled=True))
 
 
 def main() -> None:

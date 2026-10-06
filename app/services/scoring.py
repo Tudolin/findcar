@@ -41,6 +41,11 @@ def inferred_flags(v: Vehicle, penalties: dict) -> list[dict]:
     if aut and brand == "ford" and model in {"fiesta", "focus", "ecosport"} and year >= 2011:
         flags.append({"label": "Câmbio Powershift (histórico de falhas)", "penalty":
                       penalties.get("powershift", 15), "match": "inferido: Ford automático 2011+"})
+    limit = penalties.get("too_cheap_pct", -35)
+    if v.fipe_diff_pct is not None and v.fipe_diff_pct <= limit:
+        flags.append({"label": "Preço muito abaixo da FIPE (possível golpe ou erro)",
+                      "penalty": penalties.get("too_cheap", 25),
+                      "match": f"{v.fipe_diff_pct:+.0f}% da FIPE (limite {limit}%)"})
     if aut and brand in {"peugeot", "citroen"} and year <= 2015:
         flags.append({"label": "Câmbio AL4 (histórico de falhas)", "penalty":
                       penalties.get("al4", 15), "match": "inferido: PSA automático ≤2015"})

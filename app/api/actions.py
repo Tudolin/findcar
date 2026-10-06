@@ -216,7 +216,9 @@ async def save_score(request: Request, session: Session = Depends(get_session)):
         "loja": _num(form, "seller_loja", 0.8)})
     set_setting(session, "score.inferred_flags", {
         "powershift": _num(form, "inf_powershift", 15, int),
-        "al4": _num(form, "inf_al4", 15, int)})
+        "al4": _num(form, "inf_al4", 15, int),
+        "too_cheap": _num(form, "inf_too_cheap", 25, int),
+        "too_cheap_pct": _num(form, "inf_too_cheap_pct", -35, int)})
     session.commit()
     _rescore_all(session)
     return back("/settings#score", "Pesos salvos e scores recalculados")

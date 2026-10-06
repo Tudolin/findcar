@@ -16,7 +16,7 @@ DEFAULTS: dict = {
         "consumption": 5,
     },
     "score.seller_values": {"particular": 1.0, "loja": 0.8},
-    "score.inferred_flags": {"powershift": 15, "al4": 15},
+    "score.inferred_flags": {"powershift": 15, "al4": 15, "too_cheap": 25, "too_cheap_pct": -35},
     "inactive_after_runs": 3,
     "alerts": {
         "min_score": 70,

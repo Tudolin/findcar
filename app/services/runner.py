@@ -9,8 +9,9 @@ from datetime import timedelta
 from sqlmodel import Session, select
 
 from app.adapters import ADAPTERS, SearchFilters
+from app.core.browser import BrowserUnavailable
 from app.core.db import session_scope
-from app.core.http import BlockedError, PoliteClient
+from app.core.http import BlockedError, FetchError, PoliteClient
 from app.core.timeutil import utcnow
 from app.models import Listing, RedFlagRule, SavedSearch, SearchRun, SourceStatus, Vehicle
 from app.services import alerts, dedupe
@@ -20,6 +21,7 @@ from app.services.ingest import (
     IngestStats,
     assign_vehicle,
     mark_missing,
+    merge_detail,
     refresh_vehicles,
     upsert,
 )
@@ -64,44 +66,59 @@ def run_search_source(session: Session, search: SavedSearch, source: str,
     session.flush()
     st = _status(session, source)
     st.last_run_at = utcnow()
+    owns_adapter = adapter is None
     adapter = adapter or ADAPTERS[source]()
     stats, events = IngestStats(), alerts.RunEvents()
     normalizer = Normalizer.from_db(session)
     seen: set[int] = set()
     new_listings: list[Listing] = []
-    ok = True
+    complete = False  # only a full, unblocked pass may mark listings as sold
     try:
-        for flt in filters_for(search):
-            for raw in adapter.search(flt):
-                before = stats.new
-                li = upsert(session, raw, normalizer, search.id, stats, events)
-                seen.add(li.id)
-                if stats.new > before:
-                    new_listings.append(li)
-        _enrich_new(session, adapter, new_listings)
-        for li in [session.get(Listing, i) for i in seen]:
-            v = assign_vehicle(session, li, events)
-            stats.touched_vehicles.add(v.id)
-        mark_missing(session, search.id, source, seen, stats, events)
-        run.status = "ok"
-        st.last_status, st.last_error, st.blocked_since = "ok", None, None
-        st.last_success_at = utcnow()
-    except BlockedError as exc:
-        ok = False
-        run.status, run.error = "blocked", str(exc)
-        st.last_status, st.last_error = "blocked", str(exc)
-        st.blocked_since = st.blocked_since or utcnow()
-        log.warning("source blocked; run stopped", extra={"source": source, "err": str(exc)})
-        alerts._emit(session, "blocked", f"blocked:{source}:{utcnow():%Y%m%d}", None,
-                     f"⛔ {source} bloqueou o acesso (anti-bot). Execução interrompida; "
-                     "nenhuma tentativa de contornar.")
-    except Exception as exc:
-        ok = False
-        run.status, run.error = "error", f"{type(exc).__name__}: {exc}"[:2000]
-        st.last_status, st.last_error = "error", run.error
-        log.exception("source run failed", extra={"source": source})
+        try:
+            for flt in filters_for(search):
+                for raw in adapter.search(flt):
+                    before = stats.new
+                    li = upsert(session, raw, normalizer, search.id, stats, events)
+                    seen.add(li.id)
+                    if stats.new > before:
+                        new_listings.append(li)
+            complete = True
+            run.status = "ok"
+            st.last_status, st.last_error, st.blocked_since = "ok", None, None
+            st.last_success_at = utcnow()
+        except BlockedError as exc:
+            run.status, run.error = "blocked", str(exc)
+            st.last_status, st.last_error = "blocked", str(exc)
+            st.blocked_since = st.blocked_since or utcnow()
+            log.warning("source blocked; run stopped", extra={"source": source, "err": str(exc)})
+            alerts._emit(session, "blocked", f"blocked:{source}:{utcnow():%Y%m%d}", None,
+                         f"⛔ {source} bloqueou o acesso (anti-bot). Execução interrompida; "
+                         "nenhuma tentativa de contornar.")
+        except BrowserUnavailable as exc:
+            run.status, run.error = "error", f"Navegador indisponível: {exc}"[:2000]
+            st.last_status, st.last_error = "error", run.error
+            log.error("browser unavailable", extra={"source": source, "err": str(exc)})
+        except Exception as exc:
+            run.status, run.error = "error", f"{type(exc).__name__}: {exc}"[:2000]
+            st.last_status, st.last_error = "error", run.error
+            log.exception("source run failed", extra={"source": source})
 
-    if ok:
+        # Whatever was collected is processed, even when the pass was cut short.
+        if seen:
+            if complete:
+                backlog = [li for i in seen if (li := session.get(Listing, i)) and not li.detail_fetched
+                           and li not in new_listings]
+                _enrich_new(session, adapter, new_listings + backlog)
+            for li in [session.get(Listing, i) for i in seen]:
+                v = assign_vehicle(session, li, events)
+                stats.touched_vehicles.add(v.id)
+        if complete:
+            mark_missing(session, search.id, source, seen, stats, events)
+    finally:
+        if owns_adapter:
+            adapter.close()
+
+    if seen or stats.touched_vehicles:
         refresh_vehicles(session, stats.touched_vehicles)
         _fipe_and_score(session, stats.touched_vehicles)
         alerts.process(session, events)
@@ -114,16 +131,25 @@ def run_search_source(session: Session, search: SavedSearch, source: str,
 
 
 def _enrich_new(session: Session, adapter, listings: list[Listing]) -> None:
-    """Detail pages + photo hashes for brand-new listings only (bounded per run)."""
+    """Detail pages + photo hashes, new listings first, then the backlog (bounded per run)."""
     cap = int(get_setting(session, "details")["max_per_run"])
     use_hash = get_setting(session, "dedupe")["photo_hash"]
     img_client = PoliteClient(min_delay=1.0, max_delay=2.0, cache_ttl=0) if use_hash else None
     try:
         for li in listings[:cap]:
             if adapter.supports_detail and not li.detail_fetched:
-                detail = adapter.fetch_detail(li.url)
-                if detail and detail.description:
-                    li.description = detail.description
+                try:
+                    detail = adapter.fetch_detail(li.url)
+                except FetchError as exc:  # one broken ad page must not sink the run
+                    log.info("detail fetch failed", extra={"url": li.url, "err": str(exc)})
+                    detail = None
+                except BlockedError as exc:
+                    # Stop asking for ad pages this run; search results are kept and the
+                    # remaining details are retried next run.
+                    log.warning("detail blocked; stopping detail fetches", extra={"err": str(exc)})
+                    break
+                if detail:
+                    merge_detail(li, detail)
                 li.detail_fetched = True
             if img_client and li.photos and not li.photo_hash:
                 li.photo_hash = dedupe.photo_hash_for(img_client, li.photos[0])

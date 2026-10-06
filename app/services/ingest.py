@@ -54,6 +54,25 @@ def apply_raw(listing: Listing, raw: RawListing, normalizer: Normalizer) -> None
         listing.detail_fetched = True
 
 
+def merge_detail(listing: Listing, detail: RawListing) -> None:
+    """Fill a listing with what only the ad page has (description, color, seller, photos…)."""
+    if detail.description:
+        listing.description = detail.description
+    for f in ("color", "fuel", "seller_name", "neighborhood"):
+        value = getattr(detail, f)
+        if value and not getattr(listing, f):
+            setattr(listing, f, value)
+    if detail.km and not listing.km:
+        listing.km = detail.km
+    if detail.year_fab and detail.year_model and detail.year_fab != detail.year_model:
+        listing.year_fab, listing.year_model = detail.year_fab, detail.year_model
+    listing.transmission = normalize_transmission(detail.transmission) or listing.transmission
+    listing.seller_type = normalize_seller(detail.seller_type) or listing.seller_type
+    if len(detail.photos) > len(listing.photos or []):
+        listing.photos = detail.photos
+    listing.detail_fetched = True
+
+
 def upsert(session: Session, raw: RawListing, normalizer: Normalizer, search_id: int | None,
            stats: IngestStats, events: RunEvents) -> Listing:
     now = utcnow()

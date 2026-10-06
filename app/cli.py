@@ -11,6 +11,7 @@ import sys
 from pathlib import Path
 
 from app.adapters import ADAPTERS, SearchFilters
+from app.core.browser import BrowserUnavailable
 from app.core.config import get_settings
 from app.core.http import BlockedError, FetchError, PoliteClient
 from app.core.logging import setup_logging
@@ -25,12 +26,21 @@ def probe(args) -> int:
     adapter = ADAPTERS[args.source](PoliteClient(cache_ttl=0))
     try:
         items = adapter.search(_filters(args))
+        if items and adapter.supports_detail:
+            d = adapter.fetch_detail(items[0].url)
+            print("detalhe do 1º anúncio:", json.dumps({k: getattr(d, k) for k in (
+                "color", "transmission", "seller_type", "km")} if d else None, ensure_ascii=False))
     except BlockedError as exc:
         print(f"BLOQUEADO: {exc}")
         return 2
     except FetchError as exc:
         print(f"ERRO DE REDE: {exc}")
         return 3
+    except BrowserUnavailable as exc:
+        print(f"NAVEGADOR INDISPONÍVEL: {exc}")
+        return 4
+    finally:
+        adapter.close()
     print(f"{len(items)} anúncios após filtros")
     for it in items[:5]:
         print(json.dumps({k: getattr(it, k) for k in (
@@ -45,13 +55,15 @@ def capture(args) -> int:
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     try:
-        html = adapter.client.get_text(url, use_cache=False)
+        html = adapter.fetch_search_html(_filters(args))
     except BlockedError as exc:
         print(f"BLOQUEADO: {exc}")
         return 2
     except FetchError as exc:
         print(f"ERRO DE REDE: {exc}")
         return 3
+    finally:
+        adapter.close()
     path = out / f"{args.source}_search.html"
     path.write_text(html, encoding="utf-8")
     print(f"salvo {path} ({len(html)} bytes) de {url}")

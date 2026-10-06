@@ -12,7 +12,7 @@ from pathlib import Path
 
 from app.adapters import ADAPTERS, SearchFilters
 from app.core.config import get_settings
-from app.core.http import BlockedError, PoliteClient
+from app.core.http import BlockedError, FetchError, PoliteClient
 from app.core.logging import setup_logging
 
 
@@ -28,6 +28,9 @@ def probe(args) -> int:
     except BlockedError as exc:
         print(f"BLOQUEADO: {exc}")
         return 2
+    except FetchError as exc:
+        print(f"ERRO DE REDE: {exc}")
+        return 3
     print(f"{len(items)} anúncios após filtros")
     for it in items[:5]:
         print(json.dumps({k: getattr(it, k) for k in (
@@ -46,6 +49,9 @@ def capture(args) -> int:
     except BlockedError as exc:
         print(f"BLOQUEADO: {exc}")
         return 2
+    except FetchError as exc:
+        print(f"ERRO DE REDE: {exc}")
+        return 3
     path = out / f"{args.source}_search.html"
     path.write_text(html, encoding="utf-8")
     print(f"salvo {path} ({len(html)} bytes) de {url}")

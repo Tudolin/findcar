@@ -1,0 +1,96 @@
+# carwatch — Docker Compose (funciona direto no Dockge).
+#
+#   cp .env.example .env   # preencha POSTGRES_PASSWORD e, se quiser, Telegram
+#   docker compose up -d
+#
+# Serviços:
+#   db       PostgreSQL 16, volume nomeado `pgdata`, sem porta publicada
+#   migrate  one-shot: `alembic upgrade head` + seed idempotente, depois sai
+#   app      FastAPI + UI + agendador de scraping (1 processo, 1 worker)
+#
+# Exposição: só o `app` publica porta, em ${BIND_ADDRESS}. O padrão 127.0.0.1 não
+# expõe nada na LAN; para acessar pelo Tailscale use o IP 100.x do host
+# (`tailscale ip -4`) ou `tailscale serve --bg 8000`.
+
+name: carwatch
+
+x-app: &app
+  image: ghcr.io/tudolin/findcar:${TAG:-latest}
+  build:
+    context: .
+  environment:
+    DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-carwatch}:${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env}@db:5432/${POSTGRES_DB:-carwatch}
+    TIMEZONE: ${TIMEZONE:-America/Sao_Paulo}
+    LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    SCHEDULER_ENABLED: ${SCHEDULER_ENABLED:-true}
+    HTTP_MIN_DELAY: ${HTTP_MIN_DELAY:-3}
+    HTTP_MAX_DELAY: ${HTTP_MAX_DELAY:-5}
+    HTTP_CACHE_TTL: ${HTTP_CACHE_TTL:-1800}
+    FIPE_TOKEN: ${FIPE_TOKEN:-}
+    TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+    TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+  networks: [carwatch]
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: carwatch-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-carwatch}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env}
+      POSTGRES_DB: ${POSTGRES_DB:-carwatch}
+      POSTGRES_INITDB_ARGS: --encoding=UTF8 --locale=C
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-carwatch} -d ${POSTGRES_DB:-carwatch}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks: [carwatch]
+    deploy:
+      resources:
+        limits:
+          memory: ${DB_MEMORY_LIMIT:-512M}
+
+  migrate:
+    <<: *app
+    container_name: carwatch-migrate
+    command: ["sh", "-c", "alembic upgrade head && python -m app.seed"]
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  app:
+    <<: *app
+    container_name: carwatch-app
+    restart: unless-stopped
+    volumes:
+      - appdata:/data
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${APP_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=4).status == 200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: ${APP_MEMORY_LIMIT:-512M}
+
+volumes:
+  pgdata:
+  appdata:
+
+networks:
+  carwatch:

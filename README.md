@@ -56,6 +56,28 @@ ou use `docker compose up -d --build` a partir de um clone.
 
 O Postgres não publica porta.
 
+### No celular (app instalável)
+
+A interface é responsiva e foi pensada para toque:
+- barra de abas inferior e menu "Mais"
+- alvos de toque de 44px
+- campos com 16px (o iPhone não dá zoom)
+- filtros recolhíveis
+- galeria com swipe
+- Kanban com colunas deslizáveis e "segurar para arrastar"
+- respeita a área segura do iPhone
+- tema claro/escuro automático
+
+Também é um **PWA**, então dá para instalar na tela inicial e abrir em tela cheia, como um app:
+
+1. Instale o Tailscale no celular e entre na mesma tailnet.
+2. A instalação exige **HTTPS**. No servidor: `tailscale serve --bg 8000`, mantendo
+   `BIND_ADDRESS=127.0.0.1`. Abra `https://<host>.<tailnet>.ts.net`.
+3. Android/Chrome: menu ⋮ → **Instalar app**. iPhone/Safari: Compartilhar → **Adicionar à Tela de Início**.
+
+Sem rede, o app mostra uma tela "sem conexão" em vez de dados velhos. Preços sempre vêm do
+servidor.
+
 ### Variáveis de ambiente
 
 | variável | padrão | uso |

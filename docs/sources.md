@@ -1,9 +1,23 @@
 # Fontes — status da investigação
 
-> **Status: NÃO VERIFICADO.** O container onde esta investigação rodou tem política
-> de rede que bloqueia `www.olx.com.br` e `www.webmotors.com.br` (proxy responde 403 no
-> CONNECT). Nada abaixo foi observado em tráfego real; são **hipóteses** a confirmar
-> assim que o acesso for liberado (ou com HARs/HTML salvos por você).
+> **Status (2026-10-06): BLOQUEADO a partir de IP de datacenter.** Investigação parada
+> conforme a regra do projeto (não burlar bloqueios). Os itens marcados como hipótese
+> ainda precisam ser confirmados a partir de um IP residencial (homelab) ou de HAR salvo.
+
+## Observado em 2026-10-06 (container em nuvem, IP de datacenter, httpx/curl com UA de Chrome)
+| fonte | resultado | proteção |
+|---|---|---|
+| OLX (`/autos-e-pecas/...?pe=50000&rs=32`) | **403** "Attention Required! \| Cloudflare" (até `robots.txt` deu 403) | Cloudflare WAF/Bot Management (`__cf_bm`) |
+| Webmotors (`/carros/pr-curitiba?...`) | **403** "Access to this page has been denied" com captcha | PerimeterX/HUMAN (app `PX7Vv0zOst`), via CloudFront |
+| FIPE (`fipe.parallelum.com.br/api/v2`) | **200** JSON, sem chave | — |
+
+Webmotors `robots.txt`: `Disallow: /api/detail/`, `/comprar/` (com Allow por marca) e uma seção
+para bots de IA (GPTBot, ClaudeBot etc.). As páginas de busca `/carros/...` não aparecem como Disallow
+no trecho lido. O scraper do carwatch deve respeitar isso e não usar `/api/detail/`.
+
+Implicação: o adapter precisa rodar a partir do homelab (IP residencial), em baixo volume.
+Se o bloqueio persistir também de lá, a fonte fica desativada e marcada `blocked` em `/health`;
+não haverá tentativa de contornar o captcha nem fingerprinting.
 
 ## Checklist de investigação (por fonte)
 

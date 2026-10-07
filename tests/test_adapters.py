@@ -147,3 +147,57 @@ def test_olx_title_helpers():
     assert nt(_transmission_from_title("Hyundai HB20 Comf./c.plus/c.style 1.0 Flex 12V 2014")) == "manual"
     assert nt(_transmission_from_title("Honda Fit Ex/s/ex 1.5 Flex/flexone 16V 5P Aut. 2010")) == "automatico"
     assert _transmission_from_title("Fit 2010 lindo") is None
+
+
+# -- SóCarrão --------------------------------------------------------------------------
+SC_SEARCH = fixture_text("socarrao/search_fit.html")
+SC_DETAIL = fixture_text("socarrao/detail.html")
+
+
+def test_nuxt_devalue_decoder():
+    from app.adapters.nuxt import decode
+
+    payload = [["Reactive", 1], {"a": 2, "list": 3, "when": 5}, "x", [4, 4], {"n": 6}, ["Date", "2026-10-07"], 7]
+    assert decode(payload) == {"a": "x", "list": [{"n": 7}, {"n": 7}], "when": "2026-10-07"}
+
+
+def test_socarrao_search_payload():
+    from app.adapters.socarrao import SoCarraoAdapter
+
+    items = SoCarraoAdapter(fast_client(lambda r: None)).parse_search(SC_SEARCH)
+    assert len(items) == 55
+    a = items[0]
+    assert a.external_id == "3675311"
+    assert a.url == "https://www.socarrao.com.br/pr/curitiba/fit/preto/3675311"
+    assert (a.brand, a.model, a.version) == ("Honda", "Fit", "LX 1.4/ 1.4 Flex 8V/16V 5p Mec.")
+    assert (a.year_fab, a.year_model, a.km, a.price) == (2008, 2009, 230056, 43800)
+    assert (a.transmission, a.color, a.city, a.state) == ("Mecânico", "Preto", "Curitiba", "pr")
+    assert a.seller_type == "loja" and a.seller_name == "S4 Motors" and a.photos
+    assert all(i.url.endswith("/" + i.external_id) for i in items)
+
+
+def test_socarrao_detail():
+    from app.adapters.socarrao import SoCarraoAdapter
+
+    d = SoCarraoAdapter(fast_client(lambda r: None)).parse_detail(SC_DETAIL, "u")
+    assert d.external_id == "3675311" and d.price == 43800 and d.seller_type == "loja"
+    assert "laudo cautelar" in d.description and len(d.photos) == 21
+
+
+def test_socarrao_urls_respect_robots_and_filters():
+    from app.adapters.socarrao import SoCarraoAdapter
+
+    seen = []
+
+    def handler(req):
+        seen.append(str(req.url))
+        return httpx.Response(200, text=SC_SEARCH)
+
+    f = SearchFilters(brand="Honda", model="Fit", max_price=45000, min_year=2009, cities=RMC_CURITIBA, max_pages=3)
+    items = SoCarraoAdapter(fast_client(handler)).search(f)
+    assert items and all(i.price <= 45000 and i.year_model >= 2009 and i.city in RMC_CURITIBA for i in items)
+    assert seen[0] == "https://www.socarrao.com.br/pr/curitiba/honda/fit"
+    assert seen[1].endswith("?pagina=2")
+    # robots.txt disallows filter query strings: none may ever be sent
+    for url in seen:
+        assert not any(p in url for p in ("precoMax", "anoMin", "kmMax", "ordenacao", "pr=", "yr="))

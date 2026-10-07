@@ -35,3 +35,18 @@ def test_dhash_detects_same_image():
     img.save(buf1, "PNG")
     img.resize((128, 96)).save(buf2, "JPEG", quality=70)
     assert hamming(dhash(buf1.getvalue()), dhash(buf2.getvalue())) <= 6
+
+
+def test_different_dealers_and_prices_do_not_merge():
+    # Real case: same model/year/km≈, but another dealer asking 20% more → different car.
+    a = _li(source="olx", external_id="o", km=204000, price=39800, color="Preto", seller_name="Exclusiva Veículos")
+    b = _li(source="webmotors", external_id="w", km=204500, price=47900, color="Preto", seller_name="GRIFFE AUTO")
+    assert compare(a, b).score < 0.75
+
+
+def test_same_dealer_across_sources_merges():
+    a = _li(source="socarrao", external_id="s", km=204400, price=42880, color="Prata",
+            seller_name="Autoban Multimarca")
+    b = _li(source="olx", external_id="o", km=204400, price=42880, color="Prata", seller_name="AUTOBAN")
+    ms = compare(a, b)
+    assert ms.score >= 0.75 and "mesmo vendedor" in ms.reasons

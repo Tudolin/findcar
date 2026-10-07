@@ -42,6 +42,14 @@ def dhash(image_bytes: bytes, size: int = 8) -> str:
     return f"{bits:016x}"
 
 
+_SELLER_NOISE = {"veiculos", "veiculo", "multimarcas", "multimarca", "automoveis", "auto", "car", "cars",
+                 "motors", "ltda", "me", "eireli", "comercio", "de", "e"}
+
+
+def _seller_key(name: str | None) -> str:
+    return " ".join(w for w in norm(name).split() if w not in _SELLER_NOISE)
+
+
 @dataclass
 class MatchScore:
     score: float
@@ -89,6 +97,15 @@ def compare(a: Listing, b: Listing) -> MatchScore | None:
             why.append("preço")
         elif pd <= 0.12:
             s += 0.05
+        elif pd > 0.15:
+            s -= 0.15
+    sa, sb = _seller_key(a.seller_name), _seller_key(b.seller_name)
+    if sa and sb:
+        if sa == sb or sa in sb or sb in sa:
+            s += 0.15
+            why.append("mesmo vendedor")
+        else:  # two different dealers rarely sell the very same car
+            s -= 0.25
     if a.photo_hash and b.photo_hash:
         h = hamming(a.photo_hash, b.photo_hash)
         if h <= 6:

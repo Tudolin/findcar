@@ -1,6 +1,6 @@
 # Fontes
 
-Status atual: **as duas fontes funcionam** (verificado ao vivo em 2026-10-06, com uma execução
+Status atual: **as três fontes funcionam** (SóCarrão adicionado e verificado em 2026-10-07) (verificado ao vivo em 2026-10-06, com uma execução
 completa: 139 anúncios, 125 veículos, 98% com FIPE e 14 carros unidos entre as fontes).
 
 ## Resumo
@@ -8,6 +8,7 @@ completa: 139 anúncios, 125 veículos, 98% com FIPE e 14 carros unidos entre as
 | fonte | como lê | onde estão os dados | detalhe do anúncio |
 |---|---|---|---|
 | **OLX** | Chromium headless (sempre) | cards `section.olx-adcard` renderizados no HTML | `<script id="initial-data" data-json>`: descrição, cor, câmbio, combustível, `professionalAd`, fotos, `has_auction` |
+| **SóCarrão** | HTTP (sem bloqueio) | `__NUXT_DATA__` (Nuxt 3, formato devalue): lista estruturada com versão FIPE, câmbio, cor, km, anos, preço, vendedor e fotos | `vehicle` no mesmo payload: descrição, `isReseller`, fotos |
 | **Webmotors** | HTTP; Chromium se for barrado | cards com link `/comprar/…/{id}` (h2 marca+modelo, h3 versão, p ano/km/cidade/preço); fallback `__NEXT_DATA__.props.pageProps.catalogProps.items` | JSON-LD `Car` (cor, câmbio, combustível, km, anos) + `Product` (preço, vendedor `AutoDealer` = loja) |
 
 As fixtures em `tests/fixtures/` são páginas **reais** capturadas nessa data.
@@ -29,6 +30,23 @@ As fixtures em `tests/fixtures/` são páginas **reais** capturadas nessa data.
 - **Bloqueio:** o Cloudflare às vezes desafia uma requisição isolada. Nesse caso há **uma**
   nova tentativa depois de ~60 s; se bloquear de novo, a execução para e é registrada. Nenhum
   captcha é resolvido.
+
+## SóCarrão
+
+- **Sem muro anti-bot:** HTTP comum recebe 200. Os dados vêm do `<script id="__NUXT_DATA__">`,
+  um array "achatado" em que objetos guardam índices de outros elementos; ele é decodificado por
+  `app/adapters/nuxt.py`. A loja de resultados fica sob uma chave aleatória (hash), localizada
+  pelo formato (`results[]` com `priceInfo`).
+- **robots.txt:** proíbe **todas** as query strings de filtro (`precoMax`, `anoMin`, `kmMax`,
+  `ordenacao`, `pr=`, `yr=`, `cty=`…). Por isso só usamos a forma por caminho
+  `/{uf}/{cidade}/{marca}/{modelo}` (raio de 100 km da cidade) e `?pagina=N`, que é permitida.
+  Preço, ano, km e cidade são filtrados localmente, e um teste garante que nenhum desses
+  parâmetros seja enviado.
+- **Página:** 55 anúncios por página. Exemplo: Fit em Curitiba e região, 181 anúncios.
+- **Detalhe** `/{uf}/{cidade}/{modelo}/{cor}/{id}`: esquema próprio (`vehicleId`, `brandName`,
+  `gear`, `mileage`, `isReseller`, `description`, `photos`).
+- **Sobreposição:** lojas publicam o mesmo carro em várias fontes. Na primeira execução real,
+  11 de 18 anúncios do SóCarrão já existiam na OLX e/ou Webmotors e foram unidos.
 
 ## Webmotors
 

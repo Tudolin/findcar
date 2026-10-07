@@ -1,6 +1,6 @@
 # carwatch
 
-Monitor self-hosted de carros usados (OLX e Webmotors). Ele guarda o histórico
+Monitor self-hosted de carros usados (OLX, Webmotors e SóCarrão). Ele guarda o histórico
 de preços, une o mesmo carro anunciado em fontes diferentes, compara com a FIPE, dá um score
 explicado (0–100) e avisa no Telegram. Uso pessoal, um usuário, roda no homelab com Docker Compose.
 
@@ -14,7 +14,7 @@ APScheduler · Jinja2 + HTMX + Alpine.js + Chart.js (sem build step, libs servid
 | Buscas salvas | CRUD em **Buscas**; cada busca ativa roda nos horários de **Configurações → Agenda** |
 | Histórico de preços | toda mudança vira um ponto em `price_history`; gráfico por anúncio |
 | Vendido/inativo | anúncio que some por N execuções (padrão 3) fica inativo e mantém o último preço |
-| Deduplicação | modelo + ano + km + cor + cidade + versão + preço + hash da 1ª foto + descrição → confiança; une automaticamente ≥ 0,75, sugere ≥ 0,5; unir/separar manual |
+| Deduplicação | modelo + ano + km + cor + cidade + versão + preço + vendedor + hash da 1ª foto + descrição → confiança; une automaticamente ≥ 0,75, sugere ≥ 0,5; unir/separar manual |
 | FIPE | API gratuita `fipe.parallelum.com.br/api/v2`, cache em `fipe_cache`, % acima/abaixo |
 | Score | preço vs FIPE, km/ano, idade, câmbio, vendedor, consumo; red flags por regex (leilão, sinistro, repasse, “no estado”, Powershift, AL4…); cada ponto é explicado |
 | Comparativo | até 6 veículos, melhor valor de cada linha destacado, export CSV |
@@ -30,6 +30,8 @@ Verificado ao vivo em 2026-10-06, com fixtures de teste reais:
 - **OLX:** lida com **Chromium headless** (mesma lógica do findhome: cards `section.olx-adcard` e
   JSON `#initial-data` do anúncio). Clientes HTTP comuns recebem 403 do Cloudflare.
 - **Webmotors:** HTTP primeiro (funciona de IP residencial). Se for barrado, cai para o Chromium.
+- **SóCarrão:** HTTP; lê o payload do Nuxt (`__NUXT_DATA__`). O `robots.txt` proíbe filtros por
+  query string, então a busca usa só o caminho `/{uf}/{cidade}/{marca}/{modelo}` e o filtro é local.
 - Em bloqueio ou captcha: **uma** nova tentativa depois de ~60 s. Se repetir, a execução para,
   registra `blocked` e manda alerta. Não há tentativa de resolver captcha.
 

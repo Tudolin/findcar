@@ -21,7 +21,8 @@
   <div class="row wrap" style="gap:18px">
     <label class="check"><input type="checkbox" name="automatic_only" {{ 'checked' if f.automatic_only }}> Só câmbio automático</label>
     <label class="check"><input type="checkbox" name="sources" value="webmotors" {{ 'checked' if not s or 'webmotors' in s.sources }}> Webmotors</label>
-    <label class="check"><input type="checkbox" name="sources" value="olx" {{ 'checked' if s and 'olx' in s.sources }}> OLX</label>
+    <label class="check"><input type="checkbox" name="sources" value="olx" {{ 'checked' if not s or 'olx' in s.sources }}> OLX</label>
+    <label class="check"><input type="checkbox" name="sources" value="socarrao" {{ 'checked' if not s or 'socarrao' in s.sources }}> SóCarrão</label>
     <label class="check"><input type="checkbox" name="enabled" {{ 'checked' if not s or s.enabled }}> Ativa no agendador</label>
   </div>
   <div class="callout small">Os filtros também são aplicados localmente depois da coleta, então resultados fora do critério nunca entram, mesmo que o site os devolva.</div>

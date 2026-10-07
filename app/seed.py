@@ -81,7 +81,7 @@ def seed(session: Session) -> None:
                 "automatic_only": False, "state": "pr", "city": "curitiba",
                 "cities": RMC_CURITIBA, "max_pages": 3,
             },
-            sources=["webmotors", "olx"],
+            sources=["webmotors", "olx", "socarrao"],
         ))
     if not session.exec(select(Alias)).first():
         for pat, canon in BRAND_ALIASES.items():
@@ -99,6 +99,8 @@ def seed(session: Session) -> None:
                                   consumption_road=road, notes="aprox."))
     if session.get(SourceStatus, "webmotors") is None:
         session.add(SourceStatus(name="webmotors", enabled=True))
+    if session.get(SourceStatus, "socarrao") is None:
+        session.add(SourceStatus(name="socarrao", enabled=True))
     if session.get(SourceStatus, "olx") is None:
         # Read through headless Chromium (plain HTTP gets Cloudflare 403) — see docs/sources.md.
         session.add(SourceStatus(name="olx", enabled=True))

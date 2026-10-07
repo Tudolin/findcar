@@ -57,5 +57,5 @@ def fipe_class(p) -> str:
 templates.env.filters.update(brl=brl, km=km, pct=pct, dt=dt, ago=ago, num=num,
                              score_class=score_class, fipe_class=fipe_class)
 templates.env.globals.update(STAGES=list(Stage), STAGE_LABELS=STAGE_LABELS,
-                             SOURCE_LABELS={"olx": "OLX", "webmotors": "Webmotors"},
+                             SOURCE_LABELS={"olx": "OLX", "webmotors": "Webmotors", "socarrao": "SóCarrão"},
                              TRANSMISSION={"automatico": "Automático", "manual": "Manual"})

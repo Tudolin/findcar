@@ -109,7 +109,7 @@ window.addEventListener("load", () => {
   });
   new Chart(document.getElementById("bySource"), {
     type: "doughnut",
-    data: { labels: BYSRC.labels.map((s) => ({olx: "OLX", webmotors: "Webmotors"})[s] || s),
+    data: { labels: BYSRC.labels.map((s) => ({olx: "OLX", webmotors: "Webmotors", socarrao: "SóCarrão"})[s] || s),
             datasets: [{ data: BYSRC.counts, backgroundColor: cwPalette, borderWidth: 0 }] },
     options: { cutout: "68%", plugins: { legend: { position: "bottom" } } },
   });

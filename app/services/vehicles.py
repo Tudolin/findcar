@@ -9,7 +9,7 @@ from app.models import KanbanEvent, Listing, ModelSpec, RedFlagRule, Vehicle
 from app.services import scoring
 from app.services.config_store import get_setting
 
-SOURCE_PRIORITY = {"webmotors": 0, "olx": 1}
+SOURCE_PRIORITY = {"webmotors": 0, "socarrao": 1, "olx": 2}  # most structured data first
 
 
 def listings_of(session: Session, vehicle_id: int) -> list[Listing]:

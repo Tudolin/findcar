@@ -19,7 +19,7 @@
     <label class="field">Preço máx.<input type="number" name="max_price" value="{{ f.max_price or '' }}" step="1000" placeholder="R$"></label>
     <label class="field">Ano mín.<input type="number" name="min_year" value="{{ f.min_year or '' }}" placeholder="2009"></label>
     <label class="field">Km máx.<input type="number" name="max_km" value="{{ f.max_km or '' }}" step="5000"></label>
-    <label class="field">Fonte<select name="source"><option value="">Todas</option><option value="webmotors" {{ 'selected' if f.source=='webmotors' }}>Webmotors</option><option value="olx" {{ 'selected' if f.source=='olx' }}>OLX</option></select></label>
+    <label class="field">Fonte<select name="source"><option value="">Todas</option><option value="webmotors" {{ 'selected' if f.source=='webmotors' }}>Webmotors</option><option value="olx" {{ 'selected' if f.source=='olx' }}>OLX</option><option value="socarrao" {{ 'selected' if f.source=='socarrao' }}>SóCarrão</option></select></label>
     <label class="field">Ordenar<select name="sort">
       {% for k, l in [("score","Melhor score"),("price","Menor preço"),("fipe","Mais abaixo da FIPE"),("km","Menor km"),("year","Mais novo"),("recent","Mais recentes")] %}<option value="{{ k }}" {{ 'selected' if f.sort == k }}>{{ l }}</option>{% endfor %}
     </select></label>

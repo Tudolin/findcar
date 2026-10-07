@@ -146,7 +146,7 @@ const HISTORY = {{ history|tojson }};
 window.addEventListener("load", () => {
   cwChartDefaults();
   const datasets = Object.entries(HISTORY).map(([src, pts], i) => ({
-    label: ({olx: "OLX", webmotors: "Webmotors"})[src] || src, data: pts, stepped: true,
+    label: ({olx: "OLX", webmotors: "Webmotors", socarrao: "SóCarrão"})[src] || src, data: pts, stepped: true,
     borderColor: cwPalette[i], backgroundColor: cwPalette[i], pointRadius: 3, borderWidth: 2,
   }));
   new Chart(document.getElementById("priceChart"), {

@@ -1,40 +1,65 @@
 {% extends "base.html" %}
 {% from "macros.html" import icon %}
-{% block title %}Veículos{% endblock %}
+{% block title %}{{ "Favoritos" if f.status == "favorites" else "Veículos" }}{% endblock %}
 {% block content %}
 <div class="page-head">
-  <div><h1>Veículos</h1><p>Anúncios deduplicados entre fontes, ordenados pelo critério escolhido</p></div>
+  <div><h1>Veículos</h1><p>Anúncios deduplicados entre OLX, Webmotors e SóCarrão</p></div>
+  <a class="btn desktop-only" href="/favorites">{{ icon("star") }} Favoritos</a>
 </div>
-<form class="card card-pad" id="filters" x-data="{ open: window.innerWidth > 900 }" hx-get="/vehicles" hx-target="#results" hx-push-url="true"
-      hx-trigger="change, input changed delay:350ms from:input[type=search], submit" hx-indicator="#results">
+
+<form class="card card-pad" id="filters" action="/vehicles" method="get"
+      x-data="{ open: window.innerWidth > 900, more: {{ 'true' if f.advanced_count else 'false' }} }"
+      hx-get="/vehicles" hx-target="#results" hx-push-url="true" hx-indicator="#results"
+      hx-trigger="change, input changed delay:400ms from:input[type=search], input changed delay:600ms from:input[inputmode=numeric], submit">
   <button type="button" class="btn mobile-only" style="width:100%" @click="open = !open" :aria-expanded="open">
-    {{ icon("sliders") }} <span x-text="open ? 'Ocultar filtros' : 'Filtros e ordenação'"></span>
-    {% set active = [f.q, f.model, f.max_price, f.min_year, f.max_km, f.source, f.automatic, f.stage]|select|list|length %}
-    {% if active %}<span class="badge accent">{{ active }}</span>{% endif %}
+    {{ icon("filter") }} <span x-text="open ? 'Ocultar filtros' : 'Filtros e ordenação'"></span>
+    {% set n = f.chips()|length %}{% if n %}<span class="badge accent">{{ n }}</span>{% endif %}
   </button>
   <div x-show="open" x-collapse.duration.200ms :class="open && window.innerWidth <= 900 && 'mt'">
-  <div class="filters">
-    <label class="field">Buscar<input type="search" name="q" value="{{ f.q }}" placeholder="versão, cidade, notas…"></label>
-    <label class="field">Modelo<select name="model"><option value="">Todos</option>{% for m in models %}<option {{ 'selected' if f.model == m }}>{{ m }}</option>{% endfor %}</select></label>
-    <label class="field">Preço máx.<input type="number" name="max_price" value="{{ f.max_price or '' }}" step="1000" placeholder="R$"></label>
-    <label class="field">Ano mín.<input type="number" name="min_year" value="{{ f.min_year or '' }}" placeholder="2009"></label>
-    <label class="field">Km máx.<input type="number" name="max_km" value="{{ f.max_km or '' }}" step="5000"></label>
-    <label class="field">Fonte<select name="source"><option value="">Todas</option><option value="webmotors" {{ 'selected' if f.source=='webmotors' }}>Webmotors</option><option value="olx" {{ 'selected' if f.source=='olx' }}>OLX</option><option value="socarrao" {{ 'selected' if f.source=='socarrao' }}>SóCarrão</option></select></label>
-    <label class="field">Ordenar<select name="sort">
-      {% for k, l in [("score","Melhor score"),("price","Menor preço"),("fipe","Mais abaixo da FIPE"),("km","Menor km"),("year","Mais novo"),("recent","Mais recentes")] %}<option value="{{ k }}" {{ 'selected' if f.sort == k }}>{{ l }}</option>{% endfor %}
-    </select></label>
-  </div>
-  <div class="row wrap mt-s" style="gap:14px">
-    <div class="seg">
-      {% for k, l in [("active","Ativos"),("favorites","Favoritos"),("inactive","Inativos"),("all","Todos")] %}
-      <label><input type="radio" name="status" value="{{ k }}" {{ 'checked' if f.status == k }}><span>{{ l }}</span></label>
-      {% endfor %}
+    <div class="filters">
+      <label class="field">Buscar<input type="search" name="q" value="{{ f.q }}" placeholder="versão, cor, cidade, notas…" autocomplete="off"></label>
+      <label class="field">Modelo<select name="model"><option value="">Todos</option>{% for m in models %}<option {{ 'selected' if f.model == m }}>{{ m }}</option>{% endfor %}</select></label>
+      <label class="field">Preço até<input name="max_price" inputmode="numeric" value="{{ f.max_price or '' }}" placeholder="R$"></label>
+      <label class="field">Km até<input name="max_km" inputmode="numeric" value="{{ f.max_km or '' }}" placeholder="km"></label>
+      <label class="field">Fonte<select name="source"><option value="">Todas</option>
+        {% for k, l in [("webmotors","Webmotors"),("olx","OLX"),("socarrao","SóCarrão")] %}<option value="{{ k }}" {{ 'selected' if f.source == k }}>{{ l }}</option>{% endfor %}</select></label>
+      <label class="field">Câmbio<select name="transmission"><option value="">Qualquer</option>
+        <option value="automatico" {{ 'selected' if f.transmission == 'automatico' }}>Automático</option>
+        <option value="manual" {{ 'selected' if f.transmission == 'manual' }}>Manual</option></select></label>
+      <label class="field">Ordenar<select name="sort">{% for k, l in sorts.items() %}<option value="{{ k }}" {{ 'selected' if f.sort == k }}>{{ l }}</option>{% endfor %}</select></label>
     </div>
-    <label class="check small"><input type="checkbox" name="automatic" value="true" {{ 'checked' if f.automatic }}> Só automático</label>
-    <label class="field" style="flex-direction:row;align-items:center;gap:8px">Etapa
-      <select name="stage" style="width:auto"><option value="">Todas (exceto descartados)</option>{% for s in STAGES %}<option value="{{ s.value }}" {{ 'selected' if f.stage == s.value }}>{{ STAGE_LABELS[s] }}</option>{% endfor %}</select></label>
+
+    <div class="row wrap mt-s" style="gap:12px">
+      <div class="seg" role="radiogroup" aria-label="Situação">
+        {% for k, l in statuses.items() %}<label><input type="radio" name="status" value="{{ k }}" {{ 'checked' if f.status == k }}><span>{{ l }}</span></label>{% endfor %}
+      </div>
+      <label class="check small"><input type="checkbox" name="below_fipe" value="1" {{ 'checked' if f.below_fipe }}> Abaixo da FIPE</label>
+      <label class="check small"><input type="checkbox" name="dropped" value="1" {{ 'checked' if f.dropped }}> Baixou de preço</label>
+      <label class="check small"><input type="checkbox" name="no_flags" value="1" {{ 'checked' if f.no_flags }}> Sem red flags</label>
+      <button type="button" class="btn sm ghost" @click="more = !more" :aria-expanded="more">
+        {{ icon("sliders") }} <span x-text="more ? 'Menos filtros' : 'Mais filtros'"></span>{% if f.advanced_count %} <span class="badge accent">{{ f.advanced_count }}</span>{% endif %}
+      </button>
+    </div>
+
+    <div x-show="more" x-collapse.duration.200ms>
+      <div class="form-grid mt">
+        <label class="field">Preço a partir de<input name="min_price" inputmode="numeric" value="{{ f.min_price or '' }}" placeholder="R$"></label>
+        <label class="field">Ano de<input name="min_year" inputmode="numeric" value="{{ f.min_year or '' }}" placeholder="2009"></label>
+        <label class="field">Ano até<input name="max_year" inputmode="numeric" value="{{ f.max_year or '' }}"></label>
+        <label class="field">Score mínimo<input name="min_score" inputmode="numeric" value="{{ f.min_score or '' }}" placeholder="0–100"></label>
+        <label class="field">Vendedor<select name="seller"><option value="">Qualquer</option>
+          <option value="particular" {{ 'selected' if f.seller == 'particular' }}>Particular</option>
+          <option value="loja" {{ 'selected' if f.seller == 'loja' }}>Loja</option></select></label>
+        <label class="field">Cidade<select name="city"><option value="">Todas</option>{% for c in cities %}<option {{ 'selected' if f.city == c }}>{{ c }}</option>{% endfor %}</select></label>
+        <label class="field">Anunciado<select name="new"><option value="">Qualquer data</option>
+          <option value="1" {{ 'selected' if f.new == '1' }}>Últimas 24h</option>
+          <option value="7" {{ 'selected' if f.new == '7' }}>Últimos 7 dias</option></select></label>
+        <label class="field">Etapa<select name="stage"><option value="">Todas (exceto descartados)</option>{% for s in STAGES %}<option value="{{ s.value }}" {{ 'selected' if f.stage == s.value }}>{{ STAGE_LABELS[s] }}</option>{% endfor %}</select></label>
+      </div>
+    </div>
   </div>
-  </div>
+  <noscript><button class="btn primary mt">Filtrar</button></noscript>
 </form>
+
 <div id="results" class="mt">{% include "partials/vehicle_grid.html" %}</div>
 {% endblock %}

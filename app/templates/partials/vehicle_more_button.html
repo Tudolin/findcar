@@ -1,0 +1,6 @@
+{% if next_offset %}
+<div id="more" class="more-row">
+  <button class="btn" hx-get="{{ f.more_url(next_offset) }}" hx-target="#more" hx-swap="outerHTML" hx-push-url="false">
+    Carregar mais <span class="muted small num">({{ total - next_offset }} restantes)</span></button>
+</div>
+{% endif %}

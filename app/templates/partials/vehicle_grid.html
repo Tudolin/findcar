@@ -1,9 +1,23 @@
 {% from "macros.html" import icon, vehicle_card %}
-<div class="row between" style="margin-bottom:12px"><span class="small muted">{{ vehicles|length }} veículo{{ 's' if vehicles|length != 1 }}{% if vehicles|length >= 300 %} (limite de 300 — refine os filtros){% endif %}</span></div>
+<div class="row between wrap" style="margin-bottom:12px;gap:8px">
+  <span class="small muted"><b class="num" style="color:var(--text)">{{ total }}</b> veículo{{ 's' if total != 1 }}</span>
+  {% set chips = f.chips() %}
+  {% if chips %}
+  <div class="row wrap" style="gap:6px">
+    {% for label, url in chips %}
+    {# plain links: a full reload keeps the form inputs in sync with the URL #}
+    <a class="chip" href="{{ url }}" title="Remover filtro">{{ label }} {{ icon("x") }}</a>
+    {% endfor %}
+    <a class="chip clear" href="/vehicles">Limpar tudo</a>
+  </div>
+  {% endif %}
+</div>
 {% if vehicles %}
 <div class="vgrid">
   {% for v in vehicles %}{{ vehicle_card(v, photos.get(v.id), sources.get(v.id, [])) }}{% endfor %}
+  {% include "partials/vehicle_more_button.html" %}
 </div>
 {% else %}
-<div class="card empty">{{ icon("search") }}<div>Nenhum veículo com esses filtros.</div><div class="small mt-s">Ajuste os filtros ou <a class="link" href="/searches">rode uma busca</a>.</div></div>
+<div class="card empty">{{ icon("search") }}<div>Nenhum veículo com esses filtros.</div>
+  <div class="small mt-s">{% if chips %}<a class="link" href="/vehicles">Limpar filtros</a> ou {% endif %}<a class="link" href="/searches">rode uma busca</a>.</div></div>
 {% endif %}

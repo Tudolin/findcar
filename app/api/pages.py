@@ -1,6 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import PlainTextResponse
-from sqlmodel import Session, col, or_, select
+from sqlmodel import Session, col, func, select
 
 from app.api.templating import templates
 from app.core.db import get_session
@@ -16,20 +16,11 @@ from app.models import (
     Stage,
     Vehicle,
 )
-from app.services import compare, dedupe, runner, stats
+from app.services import compare, dedupe, finance, market, runner, stats
 from app.services.config_store import get_setting
+from app.services.vehicle_filters import PAGE_SIZE, SORTS, STATUSES, VehicleFilter
 
 router = APIRouter()
-
-SORTS = {
-    "score": (col(Vehicle.score).desc().nulls_last(),),
-    "price": (col(Vehicle.price).asc().nulls_last(),),
-    "fipe": (col(Vehicle.fipe_diff_pct).asc().nulls_last(),),
-    "km": (col(Vehicle.km).asc().nulls_last(),),
-    "year": (col(Vehicle.year_model).desc().nulls_last(),),
-    "recent": (col(Vehicle.created_at).desc(),),
-}
-
 
 def _is_htmx(request: Request) -> bool:
     return request.headers.get("HX-Request") == "true"
@@ -52,6 +43,10 @@ def dashboard(request: Request, session: Session = Depends(get_session)):
         "photos": _photos(session, [v.id for v in top]),
         "runs": stats.recent_runs(session, 6),
         "running": runner.is_running(),
+        "drops": session.exec(
+            select(Vehicle).where(Vehicle.active, Vehicle.price_drop > 0)
+            .order_by(col(Vehicle.price_drop_at).desc().nulls_last()).limit(6)
+        ).all(),
     })
 
 
@@ -83,64 +78,56 @@ def _sources_of(session: Session, ids: list[int]) -> dict[int, list[str]]:
     return out
 
 
+def _cities(session: Session) -> list[str]:
+    return sorted({c for c in session.exec(select(Vehicle.city).where(Vehicle.active)).all() if c})
+
+
 @router.get("/vehicles")
-def vehicles(
-    request: Request,
-    q: str = "",
-    model: str = "",
-    max_price: int | None = Query(None),
-    min_year: int | None = Query(None),
-    max_km: int | None = Query(None),
-    automatic: bool = False,
-    status: str = "active",
-    source: str = "",
-    stage: str = "",
-    sort: str = "score",
-    session: Session = Depends(get_session),
-):
-    stmt = select(Vehicle)
-    if status == "active":
-        stmt = stmt.where(Vehicle.active)
-    elif status == "inactive":
-        stmt = stmt.where(Vehicle.active == False)  # noqa: E712
-    elif status == "favorites":
-        stmt = stmt.where(Vehicle.favorite)
-    if model:
-        stmt = stmt.where(Vehicle.model == model)
-    if max_price:
-        stmt = stmt.where(Vehicle.price <= max_price)
-    if min_year:
-        stmt = stmt.where(Vehicle.year_model >= min_year)
-    if max_km:
-        stmt = stmt.where(Vehicle.km <= max_km)
-    if automatic:
-        stmt = stmt.where(Vehicle.transmission == "automatico")
-    if stage:
-        stmt = stmt.where(Vehicle.stage == stage)
-    else:
-        stmt = stmt.where(Vehicle.stage != Stage.DESCARTADO)
-    if source:
-        stmt = stmt.where(col(Vehicle.id).in_(select(Listing.vehicle_id)
-                                              .where(Listing.source == source)))
-    if q:
-        like = f"%{q}%"
-        stmt = stmt.where(or_(col(Vehicle.version).ilike(like), col(Vehicle.model).ilike(like),
-                              col(Vehicle.notes).ilike(like), col(Vehicle.city).ilike(like)))
-    stmt = stmt.order_by(*SORTS.get(sort, SORTS["score"])).limit(300)
-    rows = session.exec(stmt).all()
+def vehicles(request: Request, session: Session = Depends(get_session)):
+    f = VehicleFilter.from_params(request.query_params)
+    base = f.statement()
+    total = session.exec(select(func.count()).select_from(base.subquery())).one()
+    rows = session.exec(f.ordered(base).offset(f.offset).limit(PAGE_SIZE)).all()
     ids = [v.id for v in rows]
     ctx = {
-        "nav": "vehicles",
+        "nav": "favorites" if f.status == "favorites" else "vehicles",
         "vehicles": rows,
+        "total": total,
+        "next_offset": f.offset + len(rows) if f.offset + len(rows) < total else None,
         "photos": _photos(session, ids),
         "sources": _sources_of(session, ids),
         "models": stats.models_present(session),
-        "f": {"q": q, "model": model, "max_price": max_price, "min_year": min_year,
-              "max_km": max_km, "automatic": automatic, "status": status, "source": source,
-              "stage": stage, "sort": sort},
+        "cities": _cities(session),
+        "f": f,
+        "sorts": {k: v[0] for k, v in SORTS.items()},
+        "statuses": STATUSES,
     }
-    tpl = "partials/vehicle_grid.html" if _is_htmx(request) else "vehicles.html"
-    return templates.TemplateResponse(request, tpl, ctx)
+    if request.headers.get("HX-Request") == "true":
+        # "Carregar mais" appends cards; a filter change replaces the whole result block.
+        tpl = "partials/vehicle_more.html" if f.offset else "partials/vehicle_grid.html"
+        return templates.TemplateResponse(request, tpl, ctx)
+    return templates.TemplateResponse(request, "vehicles.html", ctx)
+
+
+@router.get("/favorites")
+def favorites(request: Request, session: Session = Depends(get_session)):
+    rows = session.exec(
+        select(Vehicle).where(Vehicle.favorite)
+        .order_by(col(Vehicle.active).desc(), col(Vehicle.score).desc().nulls_last())
+    ).all()
+    ids = [v.id for v in rows]
+    summary = {
+        "count": len(rows),
+        "active": sum(1 for v in rows if v.active),
+        "dropped": sum(1 for v in rows if v.favorite_price and v.price and v.price < v.favorite_price),
+        "saved": sum(v.favorite_price - v.price for v in rows
+                     if v.favorite_price and v.price and v.price < v.favorite_price),
+    }
+    return templates.TemplateResponse(request, "favorites.html", {
+        "nav": "favorites", "vehicles": rows, "photos": _photos(session, ids),
+        "sources": _sources_of(session, ids), "summary": summary,
+        "days": {v.id: market.days_listed(v) for v in rows},
+    })
 
 
 @router.get("/vehicles/{vid}")
@@ -169,9 +156,16 @@ def vehicle_detail(vid: int, request: Request, session: Session = Depends(get_se
                           .order_by(col(KanbanEvent.at).desc())).all()
     spec = session.exec(select(ModelSpec).where(ModelSpec.brand == v.brand,
                                                 ModelSpec.model == v.model)).first()
+    comps = market.comparables(session, v)
+    phone = next((li.seller_phone for li in listings if li.seller_phone and li.active), None)
     return templates.TemplateResponse(request, "vehicle.html", {
         "nav": "vehicles", "v": v, "listings": listings, "history": history,
         "suggestions": suggestions, "photos": photos, "events": events, "spec": spec,
+        "comps": comps, "offer": market.offer(v, comps), "days": market.days_listed(v),
+        "checklist": market.CHECKLIST, "phone": phone,
+        "comp_photos": _photos(session, [c.id for c in comps.vehicles]),
+        "fin": get_setting(session, "finance"),
+        "fin_table": finance.table(v.price, get_setting(session, "finance")) if v.price else [],
     })
 
 
@@ -249,6 +243,7 @@ def settings_page(request: Request, session: Session = Depends(get_session)):
         "dedupe": get_setting(session, "dedupe"),
         "inactive_after": get_setting(session, "inactive_after_runs"),
         "details": get_setting(session, "details"),
+        "fin": get_setting(session, "finance"),
         "flags": session.exec(select(RedFlagRule).order_by(RedFlagRule.id)).all(),
         "aliases": session.exec(select(Alias).order_by(Alias.kind, Alias.canonical)).all(),
         "specs": session.exec(select(ModelSpec).order_by(ModelSpec.brand, ModelSpec.model)).all(),

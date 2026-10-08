@@ -1,0 +1,3 @@
+{% from "macros.html" import vehicle_card %}
+{% for v in vehicles %}{{ vehicle_card(v, photos.get(v.id), sources.get(v.id, [])) }}{% endfor %}
+{% include "partials/vehicle_more_button.html" %}

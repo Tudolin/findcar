@@ -11,6 +11,11 @@ APScheduler · Jinja2 + HTMX + Alpine.js + Chart.js (sem build step, libs servid
 
 | | |
 |---|---|
+| Lista de veículos | filtros por modelo, preço, km, ano, câmbio, fonte, vendedor, cidade, score, "abaixo da FIPE", "baixou de preço", "sem red flags", novos em 24h/7d e etapa; 8 ordenações; chips removíveis; "carregar mais" |
+| Favoritos | página própria (menu e barra do celular): variação de preço desde que favoritou, quem saiu do ar, economia acumulada, comparar todos |
+| Análise de mercado | comparáveis (mesmo modelo, ano ±1, km parecido, mesmo câmbio), preço mediano, posição do anúncio, dias anunciado e **sugestão de proposta** com os motivos |
+| Financiamento | simulador Tabela Price com entrada, prazo (12–60x), taxa e IOF aproximado; tabela por prazo; parcela no comparativo; padrões em Configurações |
+| Visita | checklist de 10 itens por carro (laudo, débitos Detran-PR, recall, test drive…), com progresso no Kanban; botão de WhatsApp com mensagem pronta quando a fonte publica o telefone |
 | Buscas salvas | CRUD em **Buscas**; cada busca ativa roda nos horários de **Configurações → Agenda** |
 | Histórico de preços | toda mudança vira um ponto em `price_history`; gráfico por anúncio |
 | Vendido/inativo | anúncio que some por N execuções (padrão 3) fica inativo e mantém o último preço |

@@ -21,6 +21,7 @@
             <span class="score {{ v.score|score_class }}" style="height:20px;min-width:30px;font-size:11.5px">{{ v.score if v.score is not none else "–" }}</span>
             {% if v.favorite %}<span class="badge mid">★</span>{% endif %}
             {% if v.notes %}<span class="badge" title="{{ v.notes[:200] }}">notas</span>{% endif %}
+            {% set ck = (v.checklist or {}).values()|select|list|length %}{% if ck %}<span class="badge {{ 'good' if ck >= 10 else '' }}" title="Checklist da visita">✓ {{ ck }}/10</span>{% endif %}
             {% if not v.active %}<span class="badge bad">inativo</span>{% endif %}
           </div>
         </div>

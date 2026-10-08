@@ -1,0 +1,14 @@
+{% from "macros.html" import icon %}
+{% set ns = namespace(done=0) %}{% for key, _ in checklist %}{% if (v.checklist or {}).get(key) %}{% set ns.done = ns.done + 1 %}{% endif %}{% endfor %}
+{% set done = ns.done %}
+<div id="checklist" class="stack" style="gap:6px">
+  <div class="row between"><h3>Checklist da visita</h3><span class="small muted num">{{ done }}/{{ checklist|length }}</span></div>
+  <div class="progress"><i style="width:{{ (100 * done / checklist|length)|round }}%"></i></div>
+  <div>
+    {% for key, label in checklist %}{% set ok = (v.checklist or {}).get(key) %}
+    <button type="button" class="check-item {{ 'done' if ok }}" hx-post="/vehicles/{{ v.id }}/checklist/{{ key }}"
+            hx-target="#checklist" hx-swap="outerHTML" aria-pressed="{{ 'true' if ok else 'false' }}">
+      <span class="box">{{ icon("check") }}</span><span>{{ label }}</span></button>
+    {% endfor %}
+  </div>
+</div>

@@ -44,6 +44,22 @@
   </div>
 </section>
 
+{% if drops %}
+<section class="card mt">
+  <div class="card-head"><div><h2>Quedas de preço recentes</h2><div class="small muted">vendedor baixou o preço — bom momento para negociar</div></div>
+    <a class="small link" href="/vehicles?dropped=1&sort=drop">ver todas</a></div>
+  <div class="table-wrap"><table class="t compact"><tbody>
+  {% for v in drops %}
+    <tr>
+      <td><a href="/vehicles/{{ v.id }}"><b>{{ v.brand }} {{ v.model }}</b> <span class="muted">{{ v.year_model }}</span><div class="tiny muted">{{ v.km|km }} · {{ v.city or "—" }}</div></a></td>
+      <td class="right num"><span class="badge good">↓ {{ v.price_drop|brl }}</span></td>
+      <td class="right num"><b>{{ v.price|brl }}</b><div class="tiny muted">{{ v.price_drop_at|ago }}</div></td>
+    </tr>
+  {% endfor %}
+  </tbody></table></div>
+</section>
+{% endif %}
+
 <section class="grid grid-2 mt">
   <div class="card">
     <div class="card-head"><h2>Distribuição de km</h2><span class="small muted">veículos ativos</span></div>

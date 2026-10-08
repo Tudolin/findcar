@@ -35,6 +35,7 @@ ROWS = [
     Row("color", "Cor", None),
     Row("city", "Cidade", None),
     Row("seller_type", "Vendedor", None),
+    Row("installment", "Parcela (padrão)", "min", "brl"),
     Row("score", "Score", "max"),
     Row("red_flags", "Red flags", None),
     Row("links", "Anúncios", None, "links"),
@@ -48,6 +49,10 @@ def load(session: Session, ids: list[int]) -> list[Vehicle]:
 
 
 def table(session: Session, vehicles: list[Vehicle]) -> dict:
+    from app.services import finance
+    from app.services.config_store import get_setting
+
+    fin = get_setting(session, "finance")
     cols = []
     for v in vehicles:
         spec = session.exec(select(ModelSpec).where(ModelSpec.brand == v.brand,
@@ -60,6 +65,9 @@ def table(session: Session, vehicles: list[Vehicle]) -> dict:
             "km": v.km, "km_year": round(v.km / age) if v.km else None,
             "year_model": v.year_model, "transmission": v.transmission, "color": v.color,
             "city": v.city, "seller_type": v.seller_type, "score": v.score,
+            "installment": finance.simulate(v.price, round(v.price * fin["down_pct"] / 100), fin["months"],
+                                            fin["rate_month"], fin["iof"], fin.get("fees", 0)).installment
+            if v.price else None,
             "consumption_city": spec.consumption_city if spec else None,
             "consumption_road": spec.consumption_road if spec else None,
             "red_flags": ", ".join(f["label"] for f in v.red_flags) or "—",

@@ -13,6 +13,11 @@
   <div class="row wrap">
     {% include "partials/fav.html" %}
     <button class="btn" @click="$store.cmp.toggle({{ v.id }})" x-text="$store.cmp.has({{ v.id }}) ? 'No comparativo ✓' : 'Adicionar ao comparativo'"></button>
+    {% set wa = phone|wa_phone %}
+    {% if wa %}
+      {% set msg = "Olá! Vi seu anúncio do " ~ v.brand ~ " " ~ v.model ~ " " ~ (v.year_model or "") ~ " por " ~ (v.price|brl) ~ ". Ele ainda está disponível?" %}
+      <a class="btn wa" href="https://wa.me/{{ wa }}?text={{ msg|urlencode }}" target="_blank" rel="noopener noreferrer">{{ icon("whatsapp") }} WhatsApp</a>
+    {% endif %}
     <form method="post" action="/vehicles/{{ v.id }}/refresh"><button class="btn" title="Reconsultar FIPE e recalcular score">{{ icon("refresh") }} FIPE/score</button></form>
   </div>
 </div>
@@ -53,9 +58,53 @@
         <div><dt>Cidade</dt><dd>{{ v.city or "—" }}{% if v.state %}/{{ v.state|upper }}{% endif %}</dd></div>
         <div><dt>Vendedor</dt><dd>{{ (v.seller_type or "—")|capitalize }}</dd></div>
         <div><dt>Consumo (aprox.)</dt><dd>{% if spec and spec.consumption_city %}{{ spec.consumption_city|num(1) }} / {{ spec.consumption_road|num(1) }} km/l{% else %}—{% endif %}</dd></div>
-        <div><dt>Status</dt><dd>{% if v.active %}<span class="pos">Ativo</span>{% else %}<span class="neg">Inativo</span>{% endif %}</dd></div>
+        <div><dt>Anunciado há</dt><dd>{% if days is not none %}{{ days }} dia{{ 's' if days != 1 }}{% else %}—{% endif %}
+          {% if not v.active %}<span class="neg small"> · inativo</span>{% endif %}</dd></div>
       </dl>
     </div>
+
+    {% if v.price %}
+    <div class="card" x-data="loan({{ v.price }}, {{ fin|tojson|forceescape }})">
+      <div class="card-head"><div><h2>Simular financiamento</h2><div class="small muted">Tabela Price · ajuste à proposta do seu banco</div></div>
+        <span class="badge" x-text="'≈ ' + yearRate().toFixed(1).replace('.', ',') + '% a.a.'"></span></div>
+      <div class="card-pad stack">
+        <div class="form-grid">
+          <label class="field">Preço negociado (R$)<input inputmode="numeric" :value="money(price)" @change="price = Math.max(1, num($event.target.value)); down = Math.min(down, price)"></label>
+          <label class="field">Entrada (R$)<input inputmode="numeric" :value="money(down)" @change="down = Math.min(num($event.target.value), price)"></label>
+          <label class="field">Taxa ao mês (%)<input inputmode="decimal" :value="String(rate).replace('.', ',')" @change="rate = parseFloat($event.target.value.replace(',', '.')) || 0"></label>
+        </div>
+        <div>
+          <div class="row between small"><span class="muted">Entrada: <b x-text="Math.round(100 * down / price) + '%'"></b></span><span class="muted" x-text="money(down)"></span></div>
+          <input type="range" min="0" :max="price" step="500" x-model.number="down" style="height:auto;padding:0;border:0;box-shadow:none">
+        </div>
+        <div class="seg" role="radiogroup" aria-label="Prazo">
+          <template x-for="n in [12, 24, 36, 48, 60]" :key="n">
+            <label><input type="radio" name="loan-months" :value="n" x-model.number="months"><span x-text="n + 'x'"></span></label>
+          </template>
+        </div>
+        <label class="check small"><input type="checkbox" x-model="iof"> Incluir IOF (≈ <span x-text="(iofRate() * 100).toFixed(2).replace('.', ',')"></span>%, financiado junto)</label>
+        <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px">
+          <div class="kpi card" style="box-shadow:none"><div class="label">Parcela</div><div class="value num" style="font-size:22px" x-text="money(sim().inst) "></div><div class="tiny muted" x-text="months + 'x'"></div></div>
+          <div class="kpi card" style="box-shadow:none"><div class="label">Total pago</div><div class="value num" style="font-size:22px" x-text="money(sim().total)"></div><div class="tiny muted">entrada + parcelas</div></div>
+          <div class="kpi card" style="box-shadow:none"><div class="label">Juros + IOF</div><div class="value num neg" style="font-size:22px" x-text="money(sim().total - price)"></div><div class="tiny muted" x-text="'+' + Math.round(100 * (sim().total - price) / price) + '% sobre o preço'"></div></div>
+        </div>
+      </div>
+      <div class="table-wrap" style="border-top:1px solid var(--border)">
+        <table class="t compact">
+          <thead><tr><th>Prazo</th><th class="right">Parcela</th><th class="right">Total pago</th><th class="right">Custo extra</th></tr></thead>
+          <tbody>
+            <template x-for="n in [12, 24, 36, 48, 60]" :key="n">
+              <tr :style="n === months && 'background:var(--accent-soft)'" @click="months = n" style="cursor:pointer">
+                <td x-text="n + 'x'"></td><td class="right num" x-text="money(sim(n).inst)"></td>
+                <td class="right num" x-text="money(sim(n).total)"></td><td class="right num neg" x-text="money(sim(n).total - price)"></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+      <noscript><div class="card-pad small">{% for s in fin_table %}{{ s.months }}x de {{ s.installment|brl }} · {% endfor %}</div></noscript>
+    </div>
+    {% endif %}
 
     <div class="card">
       <div class="card-head"><h2>Histórico de preço</h2><span class="small muted">por anúncio</span></div>
@@ -107,6 +156,47 @@
 
   <div class="stack" style="gap:16px">
     <div class="card">
+      <div class="card-head"><div><h2>Análise de mercado</h2><div class="small muted">{{ v.model }} {{ (v.year_model - 1) if v.year_model else "" }}–{{ (v.year_model + 1) if v.year_model else "" }}, km parecido{% if v.transmission %}, de preferência {{ TRANSMISSION.get(v.transmission, "").lower() }}{% endif %}</div></div></div>
+      <div class="card-pad">
+        {% if comps.count %}
+          <div class="stat-line"><span class="muted">Comparáveis</span><b class="num">{{ comps.count }}</b></div>
+          <div class="stat-line"><span class="muted">Preço mediano</span><b class="num">{{ comps.median_price|brl }}</b></div>
+          {% if comps.median_km %}<div class="stat-line"><span class="muted">Km mediano</span><b class="num">{{ comps.median_km|km }}</b></div>{% endif %}
+          {% if comps.diff_vs_median is not none %}
+          <div class="stat-line"><span class="muted">Este anúncio</span>
+            <b class="num {{ 'pos' if comps.diff_vs_median < 0 else 'neg' if comps.diff_vs_median > 0 else '' }}">
+              {% if comps.diff_vs_median == 0 %}na mediana{% else %}{{ (comps.diff_vs_median|abs)|brl }} {{ "abaixo" if comps.diff_vs_median < 0 else "acima" }} ({{ comps.diff_vs_median_pct|pct }}){% endif %}</b></div>
+          <div class="mt-s small muted">Mais barato que {{ comps.cheaper_than_pct }}% dos comparáveis</div>
+          <div class="meter mt-s" title="à esquerda = mais barato"><i style="left:{{ 100 - comps.cheaper_than_pct }}%"></i></div>
+          {% endif %}
+        {% else %}
+          <div class="small muted">Ainda não há outros {{ v.model }} parecidos ativos para comparar.</div>
+        {% endif %}
+        {% if offer %}
+        <hr class="sep">
+        <div class="small muted">Sugestão de proposta</div>
+        <div class="num" style="font-size:20px;font-weight:700;margin-top:2px">{{ offer.low|brl }} – {{ offer.high|brl }}</div>
+        <ul class="small muted" style="margin:6px 0 0;padding-left:18px">
+          {% for r in offer.reasons %}<li>{{ r }}</li>{% endfor %}
+          <li>abra perto do menor valor; estimativa, não é avaliação</li>
+        </ul>
+        {% endif %}
+      </div>
+      {% if comps.vehicles %}
+      <div style="border-top:1px solid var(--border)">
+        {% for c in comps.vehicles %}
+        <a class="listing-row small" href="/vehicles/{{ c.id }}">
+          {% if comp_photos.get(c.id) %}<img src="{{ comp_photos[c.id] }}" referrerpolicy="no-referrer" style="width:52px;height:38px;object-fit:cover;border-radius:6px" alt="">{% endif %}
+          <span class="grow"><b>{{ c.year_model }}</b> · {{ c.km|km }} · {{ TRANSMISSION.get(c.transmission, "?") }}<br><span class="muted">{{ c.version or "" }}</span></span>
+          <b class="num {{ 'pos' if v.price and c.price > v.price else 'neg' if v.price and c.price < v.price else '' }}">{{ c.price|brl }}</b>
+        </a>
+        {% endfor %}
+        {% if comps.count > comps.vehicles|length %}<a class="listing-row small link" href="/vehicles?model={{ v.model|urlencode }}&min_year={{ (v.year_model or 0) - 1 }}&max_year={{ (v.year_model or 0) + 1 }}&sort=price">Ver todos os {{ comps.count }} comparáveis →</a>{% endif %}
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="card">
       <div class="card-head"><h2>Score</h2>{{ score(v.score) }}</div>
       <div class="card-pad breakdown">
         {% for b in v.score_breakdown %}
@@ -130,6 +220,8 @@
         <label class="field">Notas<textarea name="notes" rows="6" placeholder="Ligação com vendedor, vistoria, dúvidas…">{{ v.notes }}</textarea></label>
         <div class="row between"><span class="tiny faint">Salvo localmente no seu servidor</span><button class="btn primary sm">Salvar notas</button></div>
       </form>
+      <hr class="sep" style="margin:4px 0">
+      {% include "partials/checklist.html" %}
       {% if events %}
       <hr class="sep" style="margin:4px 0">
       <ul class="timeline">

@@ -29,6 +29,8 @@ DEFAULTS: dict = {
     "schedule": {"times": ["08:10", "13:10", "19:10"], "fipe_refresh_days": 15},
     "dedupe": {"auto_threshold": 0.75, "suggest_threshold": 0.5, "photo_hash": True},
     "details": {"max_per_run": 25},
+    # Editable defaults for the loan simulator — not market quotes.
+    "finance": {"rate_month": 1.99, "down_pct": 30, "months": 48, "iof": True, "fees": 0},
 }
 
 

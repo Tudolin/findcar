@@ -68,5 +68,22 @@
     Chart.defaults.plugins.legend.labels.usePointStyle = true;
     Chart.defaults.maintainAspectRatio = false;
   };
+  // Loan simulator (same math as app/services/finance.py — Tabela Price + approximate IOF).
+  window.loan = (price, cfg) => ({
+    price, rate: cfg.rate_month, months: cfg.months, iof: !!cfg.iof, fees: cfg.fees || 0,
+    down: Math.round(price * cfg.down_pct / 100),
+    num(v) { return parseInt(String(v).replace(/\D/g, ""), 10) || 0; },
+    money(v) { return "R$ " + Math.round(v).toLocaleString("pt-BR"); },
+    iofRate(n) { return 0.0038 + 0.000082 * Math.min(365, (n || this.months) * 30); },
+    yearRate() { return (Math.pow(1 + this.rate / 100, 12) - 1) * 100; },
+    sim(n) {
+      n = n || this.months;
+      const down = Math.min(this.down, this.price), base = this.price - down;
+      const iof = this.iof && base > 0 ? Math.round(base * this.iofRate(n)) : 0;
+      const pv = base + iof + this.fees, i = this.rate / 100;
+      const inst = pv <= 0 ? 0 : Math.round(i === 0 ? pv / n : pv * i / (1 - Math.pow(1 + i, -n)));
+      return { inst, total: down + inst * n, iof };
+    },
+  });
   window.cwBRL = (v) => v == null ? "—" : "R$ " + Math.round(v).toLocaleString("pt-BR");
 })();

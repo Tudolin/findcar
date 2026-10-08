@@ -5,7 +5,7 @@
 <div class="page-head"><div><h1>Configurações</h1><p>Score, alertas, agenda, fontes e normalização</p></div></div>
 
 <div class="row" style="margin-bottom:16px;gap:6px;overflow-x:auto;padding-bottom:4px;flex-wrap:nowrap">
-  {% for a, l in [("score","Score"),("flags","Red flags"),("alertas","Alertas"),("agenda","Agenda"),("fontes","Fontes"),("consumo","Consumo"),("aliases","Aliases")] %}
+  {% for a, l in [("score","Score"),("flags","Red flags"),("alertas","Alertas"),("financiamento","Financiamento"),("agenda","Agenda"),("fontes","Fontes"),("consumo","Consumo"),("aliases","Aliases")] %}
   <a class="btn sm" href="#{{ a }}">{{ l }}</a>{% endfor %}
 </div>
 
@@ -58,6 +58,17 @@
     <label class="field">Horário do resumo diário<input type="time" name="daily_summary_time" value="{{ alerts.daily_summary_time }}"></label>
     <label class="check"><input type="checkbox" name="favorite_inactive" {{ 'checked' if alerts.favorite_inactive }}> Avisar quando favorito ficar inativo</label>
     <label class="check"><input type="checkbox" name="daily_summary" {{ 'checked' if alerts.daily_summary }}> Resumo diário</label>
+  </div>
+</form>
+
+<form id="financiamento" method="post" action="/settings/finance" class="card">
+  <div class="card-head"><div><h2>Financiamento</h2><div class="small muted">Padrões da simulação (Tabela Price). Use a taxa que o seu banco ofereceu.</div></div><button class="btn primary sm">Salvar</button></div>
+  <div class="card-pad form-grid">
+    <label class="field">Taxa ao mês (%)<input name="rate_month" inputmode="decimal" value="{{ fin.rate_month|string|replace('.', ',') }}"></label>
+    <label class="field">Entrada padrão (%)<input name="down_pct" inputmode="numeric" value="{{ fin.down_pct }}"></label>
+    <label class="field">Prazo padrão<select name="months">{% for n in [12, 24, 36, 48, 60] %}<option value="{{ n }}" {{ 'selected' if fin.months == n }}>{{ n }}x</option>{% endfor %}</select></label>
+    <label class="field">Tarifas financiadas (R$)<input name="fees" inputmode="numeric" value="{{ fin.fees }}" placeholder="cadastro, registro…"></label>
+    <label class="check"><input type="checkbox" name="iof" {{ 'checked' if fin.iof }}> Incluir IOF aproximado</label>
   </div>
 </form>
 

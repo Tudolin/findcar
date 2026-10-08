@@ -5,7 +5,7 @@ from __future__ import annotations
 from sqlmodel import Session, select
 
 from app.core.timeutil import utcnow
-from app.models import KanbanEvent, Listing, ModelSpec, RedFlagRule, Vehicle
+from app.models import KanbanEvent, Listing, ModelSpec, PricePoint, RedFlagRule, Vehicle
 from app.services import scoring
 from app.services.config_store import get_setting
 
@@ -37,9 +37,32 @@ def aggregate(session: Session, v: Vehicle) -> None:
     prices = [li.price for li in (active or ls) if li.price]
     v.price = min(prices) if prices else None
     v.active = bool(active)
+    starts = [d for li in ls for d in (li.first_seen, li.published_at) if d]
+    v.listed_since = min(starts) if starts else v.listed_since
+    _price_drop(session, v, active)
     if v.fipe_price and v.price:
         v.fipe_diff_pct = round((v.price - v.fipe_price) / v.fipe_price * 100, 1)
     v.updated_at = utcnow()
+
+
+def _price_drop(session: Session, v: Vehicle, active: list[Listing]) -> None:
+    """Biggest drop among active listings: first price ever seen → current price."""
+    best, when = 0, None
+    for li in active:
+        pts = session.exec(select(PricePoint).where(PricePoint.listing_id == li.id)
+                           .order_by(PricePoint.observed_at)).all()
+        if len(pts) < 2 or not li.price:
+            continue
+        drop = max(p.price for p in pts) - li.price
+        if drop > best:
+            best, when = drop, pts[-1].observed_at
+    v.price_drop, v.price_drop_at = (best, when) if best > 0 else (None, None)
+
+
+def toggle_favorite(v: Vehicle) -> None:
+    v.favorite = not v.favorite
+    v.favorited_at = utcnow() if v.favorite else None
+    v.favorite_price = v.price if v.favorite else None
 
 
 def rescore(session: Session, v: Vehicle, rules: list[RedFlagRule] | None = None) -> None:

@@ -45,6 +45,7 @@ class RawListing:
     state: str | None = None
     seller_type: str | None = None  # loja | particular
     seller_name: str | None = None
+    seller_phone: str | None = None
     photos: list[str] = field(default_factory=list)
     description: str = ""
     published_at: datetime | None = None

@@ -35,7 +35,7 @@ def apply_raw(listing: Listing, raw: RawListing, normalizer: Normalizer) -> None
     listing.raw_brand, listing.raw_model, listing.raw_version = raw.brand, raw.model, raw.version
     listing.brand, listing.model, listing.version = canon.brand, canon.model, canon.version
     for f in ("year_fab", "year_model", "km", "fuel", "color", "city", "neighborhood", "state",
-              "seller_name", "published_at"):
+              "seller_name", "seller_phone", "published_at"):
         value = getattr(raw, f)
         if value is not None:
             setattr(listing, f, value)
@@ -58,7 +58,7 @@ def merge_detail(listing: Listing, detail: RawListing) -> None:
     """Fill a listing with what only the ad page has (description, color, seller, photos…)."""
     if detail.description:
         listing.description = detail.description
-    for f in ("color", "fuel", "seller_name", "neighborhood"):
+    for f in ("color", "fuel", "seller_name", "seller_phone", "neighborhood"):
         value = getattr(detail, f)
         if value and not getattr(listing, f):
             setattr(listing, f, value)

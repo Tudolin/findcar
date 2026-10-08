@@ -128,6 +128,7 @@ class SoCarraoAdapter(SourceAdapter):
             transmission=_name(it.get("transmission")), fuel=_name(it.get("fuel")), color=color,
             price=price, city=city, state=uf,
             seller_type=seller_type, seller_name=user.get("name"),
+            seller_phone=re.sub(r"\D", "", str(user.get("whatsapp") or user.get("phone") or "")) or None,
             photos=[p for p in it.get("vehicleImages") or [] if isinstance(p, str)],
             description=description, has_detail=bool(description),
         )

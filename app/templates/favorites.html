@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% from "macros.html" import icon, score, fipe %}
+{% block title %}Favoritos{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Favoritos</h1><p>Os carros que você está acompanhando de perto</p></div>
+  {% if vehicles %}
+  <div class="row wrap">
+    <button class="btn" x-data @click="$store.cmp.clear(); {{ vehicles|selectattr('active')|map(attribute='id')|list|tojson|forceescape }}.slice(0, 6).forEach(id => $store.cmp.toggle(id)); location.href = $store.cmp.url()">{{ icon("scale") }} Comparar favoritos</button>
+    <a class="btn" href="/vehicles?status=favorites">{{ icon("filter") }} Filtrar</a>
+  </div>
+  {% endif %}
+</div>
+
+{% if not vehicles %}
+<div class="card empty">{{ icon("star") }}<div>Nenhum favorito ainda.</div>
+  <div class="small mt-s">Toque na estrela de um carro em <a class="link" href="/vehicles">Veículos</a> para acompanhá-lo aqui.
+  Você recebe alerta no Telegram se um favorito sair do ar.</div></div>
+{% else %}
+<section class="grid grid-kpi" style="margin-bottom:16px">
+  <div class="card kpi"><div class="label">Favoritos</div><div class="value num">{{ summary.count }}</div></div>
+  <div class="card kpi"><div class="label">Ainda anunciados</div><div class="value num">{{ summary.active }}</div></div>
+  <div class="card kpi"><div class="label">Baixaram de preço</div><div class="value num pos">{{ summary.dropped }}</div></div>
+  <div class="card kpi"><div class="label">Economia acumulada</div><div class="value num pos">{{ summary.saved|brl }}</div></div>
+</section>
+
+<div class="card">
+  {% for v in vehicles %}
+  {% set delta = (v.price - v.favorite_price) if (v.price and v.favorite_price) else none %}
+  <div class="fav-row {{ '' if v.active else 'inactive' }}">
+    <a href="/vehicles/{{ v.id }}">{% if photos.get(v.id) %}<img src="{{ photos[v.id] }}" referrerpolicy="no-referrer" alt="">{% else %}<div class="ph"></div>{% endif %}</a>
+    <div style="min-width:0" class="stack" >
+      <div class="row wrap" style="gap:6px">
+        <a href="/vehicles/{{ v.id }}"><b>{{ v.brand }} {{ v.model }}</b> <span class="muted">{{ v.year_model or "" }}</span></a>
+        {{ score(v.score) }}
+        {% if not v.active %}<span class="badge bad">Saiu do ar</span>{% endif %}
+        {% if v.stage != "novo" %}<span class="badge accent">{{ STAGE_LABELS[v.stage] }}</span>{% endif %}
+      </div>
+      <div class="small muted" style="margin-top:-6px">{{ v.version or "" }}</div>
+      <div class="row wrap" style="gap:14px">
+        <span class="num" style="font-size:18px;font-weight:700">{{ v.price|brl }}</span>
+        {% if delta is not none and delta != 0 %}
+          <span class="badge {{ 'good' if delta < 0 else 'bad' }}" title="Desde que você favoritou ({{ v.favorite_price|brl }})">{{ '−' if delta < 0 else '+' }}{{ (delta|abs)|brl }} desde que favoritou</span>
+        {% endif %}
+        {{ fipe(v) }}
+      </div>
+      <div class="small muted num">{{ v.km|km }} · {{ TRANSMISSION.get(v.transmission, "câmbio ?") }} · {{ v.city or "—" }}
+        {% if days.get(v.id) is not none %} · anunciado há {{ days[v.id] }} dia{{ 's' if days[v.id] != 1 }}{% endif %}
+        · {% for s in sources.get(v.id, []) %}{{ SOURCE_LABELS.get(s, s) }}{{ ", " if not loop.last }}{% endfor %}
+        {% if v.checklist %} · checklist {{ v.checklist.values()|select|list|length }}/10{% endif %}</div>
+      {% if v.notes %}<div class="small" style="white-space:pre-wrap;max-height:3.2em;overflow:hidden">📝 {{ v.notes }}</div>{% endif %}
+    </div>
+    <div class="row" style="justify-content:flex-end">
+      <label class="chip-check"><input type="checkbox" :checked="$store.cmp.has({{ v.id }})" @change="$store.cmp.toggle({{ v.id }})"> Comparar</label>
+      {% include "partials/fav.html" %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

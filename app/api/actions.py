@@ -23,7 +23,7 @@ from app.models import (
 from app.services import runner, scheduler, telegram
 from app.services.config_store import get_setting, set_setting
 from app.services.fipe import FipeService
-from app.services.vehicles import merge_listing_into, rescore, set_stage, split_listing
+from app.services.vehicles import merge_listing_into, rescore, set_stage, split_listing, toggle_favorite
 
 router = APIRouter()
 
@@ -48,9 +48,9 @@ def _vehicle(session: Session, vid: int) -> Vehicle:
 
 # -- vehicles -------------------------------------------------------------------------
 @router.post("/vehicles/{vid}/favorite")
-def toggle_favorite(vid: int, request: Request, session: Session = Depends(get_session)):
+def favorite_endpoint(vid: int, request: Request, session: Session = Depends(get_session)):
     v = _vehicle(session, vid)
-    v.favorite = not v.favorite
+    toggle_favorite(v)
     session.add(v)
     session.commit()
     return templates.TemplateResponse(request, "partials/fav.html", {"v": v})
@@ -64,6 +64,19 @@ def change_stage(vid: int, stage: str = Form(...), session: Session = Depends(ge
     set_stage(session, v, stage)
     session.commit()
     return toast(Response(status_code=204), "Etapa atualizada")
+
+
+@router.post("/vehicles/{vid}/checklist/{key}")
+def toggle_checklist(vid: int, key: str, request: Request, session: Session = Depends(get_session)):
+    from app.services.market import CHECKLIST
+
+    if key not in dict(CHECKLIST):
+        raise HTTPException(400)
+    v = _vehicle(session, vid)
+    v.checklist = {**(v.checklist or {}), key: not (v.checklist or {}).get(key, False)}
+    session.add(v)
+    session.commit()
+    return templates.TemplateResponse(request, "partials/checklist.html", {"v": v, "checklist": CHECKLIST})
 
 
 @router.post("/vehicles/{vid}/notes")
@@ -246,6 +259,21 @@ async def save_alerts(request: Request, session: Session = Depends(get_session))
     session.commit()
     scheduler.reload()
     return back("/settings#alertas", "Alertas salvos")
+
+
+@router.post("/settings/finance")
+async def save_finance(request: Request, session: Session = Depends(get_session)):
+    form = await request.form()
+    months = _num(form, "months", 48, int)
+    set_setting(session, "finance", {
+        "rate_month": max(0.0, min(15.0, _num(form, "rate_month", 1.99))),
+        "down_pct": max(0, min(100, _num(form, "down_pct", 30, int))),
+        "months": months if months in (12, 24, 36, 48, 60) else 48,
+        "iof": form.get("iof") == "on",
+        "fees": max(0, _num(form, "fees", 0, int)),
+    })
+    session.commit()
+    return back("/settings#financiamento", "Padrões de financiamento salvos")
 
 
 @router.post("/settings/schedule")

@@ -26,7 +26,7 @@
   <aside class="sidebar">
     <a href="/" class="brand"><span class="brand-mark">{{ icon("car") }}</span><span>carwatch</span></a>
     <nav class="nav stack" style="gap:2px">
-      {% set items = [("dashboard","/","grid","Dashboard"),("vehicles","/vehicles","car","Veículos"),("kanban","/kanban","kanban","Decisão"),("compare","/compare","scale","Comparar"),("searches","/searches","search","Buscas"),("health","/health","pulse","Saúde"),("settings","/settings","sliders","Configurações")] %}
+      {% set items = [("dashboard","/","grid","Dashboard"),("vehicles","/vehicles","car","Veículos"),("favorites","/favorites","star","Favoritos"),("kanban","/kanban","kanban","Decisão"),("compare","/compare","scale","Comparar"),("searches","/searches","search","Buscas"),("health","/health","pulse","Saúde"),("settings","/settings","sliders","Configurações")] %}
       {% for key, href, ic, label in items %}
         <a href="{{ href }}{% if key == 'compare' %}{% endif %}" class="{{ 'active' if nav == key }}"
            {% if key == 'compare' %}:href="$store.cmp.url()"{% endif %}>{{ icon(ic) }}<span>{{ label }}</span>
@@ -46,16 +46,17 @@
 
 {# ---- mobile: bottom tab bar + "Mais" sheet ---- #}
 <nav class="tabbar" aria-label="Navegação">
-  {% for key, href, ic, label in [("dashboard","/","grid","Início"),("vehicles","/vehicles","car","Veículos"),("kanban","/kanban","kanban","Decisão"),("compare","/compare","scale","Comparar")] %}
-  <a href="{{ href }}" class="{{ 'active' if nav == key }}" {% if key == 'compare' %}:href="$store.cmp.url()"{% endif %}>
-    <span class="ic">{{ icon(ic) }}{% if key == 'compare' %}<b class="pill" x-show="$store.cmp.ids.length" x-text="$store.cmp.ids.length" x-cloak></b>{% endif %}</span>{{ label }}</a>
+  {% for key, href, ic, label in [("dashboard","/","grid","Início"),("vehicles","/vehicles","car","Veículos"),("favorites","/favorites","star","Favoritos"),("kanban","/kanban","kanban","Decisão")] %}
+  <a href="{{ href }}" class="{{ 'active' if nav == key }}"><span class="ic">{{ icon(ic) }}</span>{{ label }}</a>
   {% endfor %}
-  <button type="button" :class="(more || {{ 'true' if nav in ('searches','health','settings') else 'false' }}) && 'active'" @click="more = !more" aria-haspopup="dialog" :aria-expanded="more">
+  <button type="button" :class="(more || {{ 'true' if nav in ('compare','searches','health','settings') else 'false' }}) && 'active'" @click="more = !more" aria-haspopup="dialog" :aria-expanded="more">
     <span class="ic"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></span>Mais</button>
 </nav>
 <div class="sheet-backdrop" x-show="more" x-transition.opacity x-cloak @click="more = false"></div>
 <div class="sheet" x-show="more" x-transition:enter-start="sheet-off" x-transition:leave-end="sheet-off" x-cloak role="dialog" aria-label="Mais opções">
   <div class="sheet-grip"></div>
+  <a href="/compare" :href="$store.cmp.url()" class="{{ 'active' if nav == 'compare' }}">{{ icon("scale") }} Comparar
+    <span class="badge accent" style="margin-left:auto" x-show="$store.cmp.ids.length" x-text="$store.cmp.ids.length + '/6'" x-cloak></span></a>
   <a href="/searches" class="{{ 'active' if nav == 'searches' }}">{{ icon("search") }} Buscas salvas</a>
   <a href="/health" class="{{ 'active' if nav == 'health' }}">{{ icon("pulse") }} Saúde das fontes</a>
   <a href="/settings" class="{{ 'active' if nav == 'settings' }}">{{ icon("sliders") }} Configurações</a>
